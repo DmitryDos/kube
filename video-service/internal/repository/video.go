@@ -15,8 +15,8 @@ func NewVideoRepository(db *sql.DB) *VideoRepository {
 
 func (r *VideoRepository) Create(video *model.Video) error {
     query := `
-        INSERT INTO videos (title, description, file_path, file_name, file_size, user_id, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO videos (title, description, file_path, file_size, user_id, status)
+        VALUES ($1, $2, $3, $4, $5, $6)
         RETURNING id, created_at, updated_at
     `
 
@@ -25,7 +25,6 @@ func (r *VideoRepository) Create(video *model.Video) error {
         video.Title,
         video.Description,
         video.FilePath,
-        video.FileName,
         video.FileSize,
         video.UserID,
         video.Status,
@@ -38,7 +37,7 @@ func (r *VideoRepository) FindByUserID(userID int) ([]model.Video, error) {
 
 func (r *VideoRepository) FindByUserIDPaginated(userID, page, pageSize int) ([]model.Video, error) {
     query := `
-        SELECT id, title, description, file_path, file_name, file_size, user_id, status, created_at, updated_at
+        SELECT id, title, description, file_path, file_size, user_id, status, created_at, updated_at
         FROM videos
         WHERE user_id = $1
         ORDER BY created_at DESC
@@ -66,7 +65,6 @@ func (r *VideoRepository) FindByUserIDPaginated(userID, page, pageSize int) ([]m
             &video.Title,
             &video.Description,
             &video.FilePath,
-            &video.FileName,
             &video.FileSize,
             &video.UserID,
             &video.Status,
@@ -84,7 +82,7 @@ func (r *VideoRepository) FindByUserIDPaginated(userID, page, pageSize int) ([]m
 
 func (r *VideoRepository) FindByID(id int) (*model.Video, error) {
     query := `
-        SELECT id, title, description, file_path, file_name, file_size, user_id, status, created_at, updated_at
+        SELECT id, title, description, file_path, file_size, user_id, status, created_at, updated_at
         FROM videos
         WHERE id = $1
     `
@@ -95,7 +93,6 @@ func (r *VideoRepository) FindByID(id int) (*model.Video, error) {
         &video.Title,
         &video.Description,
         &video.FilePath,
-        &video.FileName,
         &video.FileSize,
         &video.UserID,
         &video.Status,

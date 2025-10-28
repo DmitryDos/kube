@@ -29,7 +29,7 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
         return
     }
 
-    if err := c.Request.ParseMultipartForm(100 << 20); err != nil {
+    if err := c.Request.ParseMultipartForm(500 << 20); err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse form"})
         return
     }
@@ -72,6 +72,13 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
         return
     }
 
+    // Generate presigned URL for immediate client use
+    ctx := c.Request.Context()
+    presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
+    if err != nil {
+        presignedURL = ""
+    }
+
     c.JSON(http.StatusCreated, gin.H{
         "message": "Video uploaded successfully",
         "video": model.VideoResponse{
@@ -79,6 +86,7 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
             Title:       video.Title,
             Description: video.Description,
             FileSize:    video.FileSize,
+            FileURL:     presignedURL,
             Status:      video.Status,
             CreatedAt:   video.CreatedAt,
         },

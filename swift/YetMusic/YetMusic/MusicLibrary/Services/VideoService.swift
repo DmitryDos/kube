@@ -11,7 +11,6 @@ struct Video: Codable, Identifiable {
     let id: Int
     let title: String
     let description: String
-    let fileName: String
     let fileSize: Int64
     let fileURL: String
     let status: String
@@ -19,7 +18,6 @@ struct Video: Codable, Identifiable {
     
     enum CodingKeys: String, CodingKey {
         case id, title, description
-        case fileName = "file_name"
         case fileSize = "file_size"
         case fileURL = "file_url"
         case status
@@ -41,6 +39,17 @@ class VideoService: ObservableObject {
     
     private let baseURL = "https://conversational-zoila-flexuosely.ngrok-free.dev"
     private let tokenKey = "authToken"
+    private let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 300
+        config.timeoutIntervalForResource = 600
+        if #available(iOS 13.0, *) {
+            config.allowsExpensiveNetworkAccess = true
+            config.allowsConstrainedNetworkAccess = true
+            config.waitsForConnectivity = true
+        }
+        return URLSession(configuration: config)
+    }()
     
     @Published var videos: [Video] = []
     
@@ -64,6 +73,7 @@ class VideoService: ObservableObject {
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.timeoutInterval = 300
         
         let httpBody = createMultipartBody(
             videoData: videoData,
@@ -73,29 +83,34 @@ class VideoService: ObservableObject {
         )
         request.httpBody = httpBody
         
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await session.data(for: request)
         
         guard let httpResponse = response as? HTTPURLResponse else {
             throw VideoError.invalidResponse
         }
         
         guard (200...299).contains(httpResponse.statusCode) else {
+            if let errorData = String(data: data, encoding: .utf8) {
+                print("Server error response: \(errorData)")
+            }
             throw VideoError.serverError(statusCode: httpResponse.statusCode)
         }
         
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         
-        let videoResponse = try decoder.decode([String: Video].self, from: data)
-        guard let video = videoResponse["video"] else {
-            throw VideoError.invalidData
+        struct UploadResponse: Codable {
+            let message: String
+            let video: Video
         }
+        
+        let uploadResponse = try decoder.decode(UploadResponse.self, from: data)
         
         await MainActor.run {
-            videos.append(video)
+            videos.append(uploadResponse.video)
         }
         
-        return video
+        return uploadResponse.video
     }
     
     func loadVideos(page: Int = 0, pageSize: Int = 20, completion: @escaping ([Video]) -> Void) {
@@ -105,7 +120,7 @@ class VideoService: ObservableObject {
         }
         
         makeRequest(
-            endpoint: "/api/videos?page=\(page)&limit=\(pageSize)",
+            endpoint: "/api/videos/?page=\(page)&limit=\(pageSize)",
             method: "GET",
             token: token
         ) { (result: Result<VideoResponse, Error>) in
