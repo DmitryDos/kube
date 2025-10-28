@@ -30,7 +30,6 @@ func NewMinIOClient() (*MinIOClient, error) {
         return nil, err
     }
 
-    // Создаем bucket если не существует
     exists, err := client.BucketExists(context.Background(), bucket)
     if err != nil {
         return nil, err
@@ -72,8 +71,12 @@ func (m *MinIOClient) GeneratePresignedURL(ctx context.Context, objectName strin
     return url.String(), nil
 }
 
+func (m *MinIOClient) DeleteFile(ctx context.Context, objectName string) error {
+    return m.client.RemoveObject(ctx, m.bucket, objectName, minio.RemoveObjectOptions{})
+}
+
 func getEnv(key, defaultValue string) string {
-    if value := os.Getenv(key); value != "" {  // ← ИСПРАВИТЬ ЭТУ СТРОКУ
+    if value := os.Getenv(key); value != "" {
         return value
     }
     return defaultValue

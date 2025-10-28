@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS videos (
                                       title VARCHAR(255) NOT NULL,
     description TEXT,
     file_path VARCHAR(500) NOT NULL,
+    file_name VARCHAR(255),
     file_size BIGINT,
     duration INTEGER, -- в секундах
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,

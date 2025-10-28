@@ -18,11 +18,18 @@ func NewVideoHandler(service *service.VideoService) *VideoHandler {
 }
 
 func (h *VideoHandler) UploadVideo(c *gin.Context) {
-    // Получаем userID из middleware (позже добавим)
-    userID := 1 // временно
+    userID, exists := c.Get("userID")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+        return
+    }
+    userIDInt, ok := userID.(int)
+    if !ok {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID type"})
+        return
+    }
 
-    // Парсим форму
-    if err := c.Request.ParseMultipartForm(100 << 20); err != nil { // 100MB
+    if err := c.Request.ParseMultipartForm(100 << 20); err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse form"})
         return
     }
@@ -35,27 +42,31 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
     }
     defer file.Close()
 
-    // Валидация размера
-    if header.Size > 500<<20 { // 500MB
+    if header.Size > 500<<20 {
         c.JSON(http.StatusBadRequest, gin.H{"error": "File too large"})
         return
     }
 
-    // Получаем метаданные
-    var req model.CreateVideoRequest
-    if err := c.Bind(&req); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+    title := c.PostForm("title")
+    description := c.PostForm("description")
+    
+    if title == "" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Title is required"})
         return
     }
 
-    // Создаем видео
+    req := model.CreateVideoRequest{
+        Title:       title,
+        Description: description,
+    }
+
     fileHeader := &model.FileHeader{
         File:     file,
         Filename: header.Filename,
         Size:     header.Size,
     }
 
-    video, err := h.service.CreateVideo(userID, &req, fileHeader)
+    video, err := h.service.CreateVideo(userIDInt, &req, fileHeader)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create video"})
         return
@@ -75,9 +86,22 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
 }
 
 func (h *VideoHandler) GetVideos(c *gin.Context) {
-    userID := 1 // временно
+    userID, exists := c.Get("userID")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+        return
+    }
+    userIDInt := userID.(int)
 
-    videos, err := h.service.GetUserVideos(userID)
+    // Получаем параметры пагинации
+    pageStr := c.DefaultQuery("page", "0")
+    limitStr := c.DefaultQuery("limit", "0")
+    
+    page, _ := strconv.Atoi(pageStr)
+    limit, _ := strconv.Atoi(limitStr)
+    
+    // Если limit не указан, возвращаем все видео
+    videos, err := h.service.GetUserVideosPaginated(userIDInt, page, limit)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get videos"})
         return
@@ -87,7 +111,12 @@ func (h *VideoHandler) GetVideos(c *gin.Context) {
 }
 
 func (h *VideoHandler) StreamVideo(c *gin.Context) {
-    userID := 1 // временно
+    userID, exists := c.Get("userID")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+        return
+    }
+    userIDInt := userID.(int)
 
     videoID, err := strconv.Atoi(c.Param("id"))
     if err != nil {
@@ -95,12 +124,18 @@ func (h *VideoHandler) StreamVideo(c *gin.Context) {
         return
     }
 
-    video, err := h.service.GetVideo(userID, videoID)
+    video, err := h.service.GetVideo(userIDInt, videoID)
     if err != nil {
         c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
         return
     }
 
-    // Отдаем файл
-    c.File(video.FilePath)
+    ctx := c.Request.Context()
+    presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate stream URL"})
+        return
+    }
+
+    c.Redirect(http.StatusTemporaryRedirect, presignedURL)
 }

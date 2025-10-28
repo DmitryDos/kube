@@ -5,33 +5,36 @@ import { authenticateToken } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Регистрация
 router.post('/register', async (req, res) => {
     try {
         const { email, password, name } = req.body;
 
-        // Валидация
         if (!email || !password) {
             return res.status(400).json({ error: 'Email and password are required' });
         }
 
-        // Проверка существующего пользователя
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
+        }
+
+        if (password.length < 8) {
+            return res.status(400).json({ error: 'Password must be at least 8 characters long' });
+        }
+
         const existingUser = await User.findByEmail(email);
         if (existingUser) {
             return res.status(409).json({ error: 'User already exists' });
         }
 
-        // Хеширование пароля
         const passwordHash = await AuthUtils.hashPassword(password);
 
-        // Создание пользователя
         const user = await User.create({
             email,
             passwordHash,
             name: name || email.split('@')[0]
         });
 
-        // Генерация токена
         const token = AuthUtils.generateToken(user.id);
 
         res.status(201).json({
@@ -50,13 +53,17 @@ router.post('/register', async (req, res) => {
     }
 });
 
-// Логин
 router.post('/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
         if (!email || !password) {
             return res.status(400).json({ error: 'Email and password are required' });
+        }
+
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            return res.status(400).json({ error: 'Invalid email format' });
         }
 
         // Поиск пользователя
@@ -71,7 +78,6 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        // Генерация токена
         const token = AuthUtils.generateToken(user.id);
 
         res.json({
@@ -90,7 +96,6 @@ router.post('/login', async (req, res) => {
     }
 });
 
-// Получение профиля
 router.get('/profile', authenticateToken, async (req, res) => {
     try {
         const user = await User.findById(req.userId);
@@ -121,7 +126,6 @@ router.post('/logout', authenticateToken, async (req, res) => {
     }
 });
 
-// Валидация токена (для API Gateway)
 router.get('/validate', authenticateToken, (req, res) => {
     res.json({ valid: true, userId: req.userId });
 });
