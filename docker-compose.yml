@@ -4,71 +4,101 @@ services:
     ports:
       - "8080:80"
     depends_on:
-      - auth-service
-      - video-service
+      auth-service:
+        condition: service_started
+      video-service:
+        condition: service_started
 
   postgres:
     image: postgres:15
     container_name: postgres
+    env_file:
+      - .env
     environment:
-      POSTGRES_DB: video_platform
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: ${POSTGRES_DB:-video_platform}
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password123}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d video_platform -h localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   auth-service:
     build: ./auth-service
     container_name: auth-service
     ports:
       - "3000:3000"
+    env_file:
+      - .env
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: video_platform
-      DB_USER: admin
-      DB_PASSWORD: password123
-      JWT_SECRET: your-super-secret-jwt-key-here
+      DB_NAME: ${POSTGRES_DB:-video_platform}
+      DB_USER: ${POSTGRES_USER:-admin}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-password123}
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-here}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_password_123}
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   video-service:
     build: ./video-service
     ports:
       - "3001:3001"
+    env_file:
+      - .env
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: video_platform
-      DB_USER: admin
-      DB_PASSWORD: password123
+      DB_NAME: ${POSTGRES_DB:-video_platform}
+      DB_USER: ${POSTGRES_USER:-admin}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-password123}
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-here}
       MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: minioadmin
-      MINIO_SECRET_KEY: minio123
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minio123}
       MINIO_BUCKET: videos
     depends_on:
-      - postgres
-      - minio
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
     volumes:
       - video_temp:/app/temp
+    restart: on-failure
 
   redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
+    env_file:
+      - .env
+    command: redis-server --requirepass ${REDIS_PASSWORD:-redis_password_123}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_password_123}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
   minio:
     image: minio/minio
     command: server /data --console-address ":9001"
+    env_file:
+      - .env
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minio123
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio123}
     ports:
       - "9000:9000"
       - "9001:9001"

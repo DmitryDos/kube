@@ -15,8 +15,8 @@ func NewVideoRepository(db *sql.DB) *VideoRepository {
 
 func (r *VideoRepository) Create(video *model.Video) error {
     query := `
-        INSERT INTO videos (title, description, file_path, file_size, user_id, status)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO videos (title, description, file_path, file_name, file_size, user_id, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING id, created_at, updated_at
     `
 
@@ -25,6 +25,7 @@ func (r *VideoRepository) Create(video *model.Video) error {
         video.Title,
         video.Description,
         video.FilePath,
+        video.FileName,
         video.FileSize,
         video.UserID,
         video.Status,
@@ -32,14 +33,26 @@ func (r *VideoRepository) Create(video *model.Video) error {
 }
 
 func (r *VideoRepository) FindByUserID(userID int) ([]model.Video, error) {
+    return r.FindByUserIDPaginated(userID, 0, 0)
+}
+
+func (r *VideoRepository) FindByUserIDPaginated(userID, page, pageSize int) ([]model.Video, error) {
     query := `
-        SELECT id, title, description, file_path, file_size, user_id, status, created_at, updated_at
+        SELECT id, title, description, file_path, file_name, file_size, user_id, status, created_at, updated_at
         FROM videos
         WHERE user_id = $1
         ORDER BY created_at DESC
     `
+    
+    args := []interface{}{userID}
+    
+    if pageSize > 0 {
+        offset := page * pageSize
+        query += " LIMIT $2 OFFSET $3"
+        args = append(args, pageSize, offset)
+    }
 
-    rows, err := r.db.Query(query, userID)
+    rows, err := r.db.Query(query, args...)
     if err != nil {
         return nil, err
     }
@@ -53,6 +66,7 @@ func (r *VideoRepository) FindByUserID(userID int) ([]model.Video, error) {
             &video.Title,
             &video.Description,
             &video.FilePath,
+            &video.FileName,
             &video.FileSize,
             &video.UserID,
             &video.Status,
@@ -70,7 +84,7 @@ func (r *VideoRepository) FindByUserID(userID int) ([]model.Video, error) {
 
 func (r *VideoRepository) FindByID(id int) (*model.Video, error) {
     query := `
-        SELECT id, title, description, file_path, file_size, user_id, status, created_at, updated_at
+        SELECT id, title, description, file_path, file_name, file_size, user_id, status, created_at, updated_at
         FROM videos
         WHERE id = $1
     `
@@ -81,6 +95,7 @@ func (r *VideoRepository) FindByID(id int) (*model.Video, error) {
         &video.Title,
         &video.Description,
         &video.FilePath,
+        &video.FileName,
         &video.FileSize,
         &video.UserID,
         &video.Status,

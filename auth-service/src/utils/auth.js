@@ -20,7 +20,6 @@ export class AuthUtils {
 
     static async verifyToken(token) {
         try {
-            // Проверяем в blacklist
             const isBlacklisted = await redisClient.get(`blacklist:${token}`);
             if (isBlacklisted) {
                 return null;
@@ -33,7 +32,6 @@ export class AuthUtils {
     }
 
     static async addToBlacklist(token) {
-        // Добавляем токен в blacklist на время его экспирации
         const decoded = jwt.decode(token);
         if (decoded && decoded.exp) {
             const ttl = decoded.exp - Math.floor(Date.now() / 1000);
