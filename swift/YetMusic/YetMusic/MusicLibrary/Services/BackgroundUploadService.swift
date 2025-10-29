@@ -64,14 +64,23 @@ extension BackgroundUploadService: URLSessionTaskDelegate {
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        VideoTransferService.shared.finish(task: task, error: error)
-        if error == nil {
-            if let http = task.response as? HTTPURLResponse, (200...299).contains(http.statusCode) {
-                DispatchQueue.main.async {
-                    // Обновляем плейлисты/очередь метаданными после успешной загрузки
-                    TrackController.shared.loadFirstPage()
-                }
-            }
+        // Транспортная ошибка — сразу ошибка
+        if let error = error {
+            VideoTransferService.shared.finish(task: task, error: error)
+            return
+        }
+
+        // HTTP-ошибка — считаем неуспехом, чтобы UI не показывал "Готово"
+        if let http = task.response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            let httpError = NSError(domain: "UploadHTTPError", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "HTTP status \(http.statusCode)"])
+            VideoTransferService.shared.finish(task: task, error: httpError)
+            return
+        }
+
+        // Успех
+        VideoTransferService.shared.finish(task: task, error: nil)
+        DispatchQueue.main.async {
+            TrackController.shared.loadFirstPage()
         }
     }
 }

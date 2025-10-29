@@ -131,8 +131,10 @@ class VideoService: ObservableObject {
         ) { (result: Result<VideoResponse, Error>) in
             switch result {
             case .success(let response):
+                print("[VideoService] Loaded videos count: \(response.videos.count)")
                 completion(response.videos)
             case .failure:
+                print("[VideoService] Failed to load videos")
                 completion([])
             }
         }

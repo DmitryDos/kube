@@ -134,6 +134,9 @@ func (h *VideoHandler) UploadVideoRaw(c *gin.Context) {
         return
     }
 
+    // Debug log
+    c.Writer.Header().Add("X-Uploaded-Video-ID", strconv.Itoa(video.ID))
+
     ctx := c.Request.Context()
     presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
     if err != nil {
@@ -189,6 +192,8 @@ func (h *VideoHandler) GetVideos(c *gin.Context) {
         return
     }
 
+    // Debug header to quickly see counts
+    c.Writer.Header().Add("X-Videos-Count", strconv.Itoa(len(videos)))
     c.JSON(http.StatusOK, gin.H{"videos": videos})
 }
 
