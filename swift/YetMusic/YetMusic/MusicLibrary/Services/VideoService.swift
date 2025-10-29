@@ -37,7 +37,7 @@ struct CreateVideoRequest: Codable {
 class VideoService: ObservableObject {
     static let shared = VideoService()
     
-    private let baseURL = "https://conversational-zoila-flexuosely.ngrok-free.dev"
+    let baseURL = "https://conversational-zoila-flexuosely.ngrok-free.dev"
     private let tokenKey = "authToken"
     private let session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -55,6 +55,23 @@ class VideoService: ObservableObject {
     
     private init() {
         // Убираем loadVideos() из init, т.к. теперь требуется пагинация
+    }
+
+    struct StreamURLResponse: Codable { let url: String }
+
+    func fetchStreamURL(videoID: Int) async throws -> URL {
+        guard let token = getToken() else { throw VideoError.unauthorized }
+        guard let url = URL(string: baseURL + "/api/videos/\(videoID)/stream/url") else { throw VideoError.invalidURL }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw VideoError.invalidResponse
+        }
+        let decoded = try makeDecoder().decode(StreamURLResponse.self, from: data)
+        guard let finalURL = URL(string: decoded.url) else { throw VideoError.invalidURL }
+        return finalURL
     }
     
     private func getToken() -> String? {

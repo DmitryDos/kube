@@ -70,6 +70,7 @@ func main() {
         protected.POST("/upload/raw", videoHandler.UploadVideoRaw)
         protected.GET("/", videoHandler.GetVideos)
         protected.GET("/:id/stream", videoHandler.StreamVideo)
+        protected.GET("/:id/stream/url", videoHandler.GetStreamURL)
     }
 
     port := ":3001"

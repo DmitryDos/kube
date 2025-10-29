@@ -226,3 +226,34 @@ func (h *VideoHandler) StreamVideo(c *gin.Context) {
 
     c.Redirect(http.StatusTemporaryRedirect, presignedURL)
 }
+
+// GetStreamURL returns a JSON with a presigned URL for the video
+func (h *VideoHandler) GetStreamURL(c *gin.Context) {
+    userID, exists := c.Get("userID")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+        return
+    }
+    userIDInt := userID.(int)
+
+    videoID, err := strconv.Atoi(c.Param("id"))
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
+        return
+    }
+
+    video, err := h.service.GetVideo(userIDInt, videoID)
+    if err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
+        return
+    }
+
+    ctx := c.Request.Context()
+    presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate stream URL"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"url": presignedURL})
+}

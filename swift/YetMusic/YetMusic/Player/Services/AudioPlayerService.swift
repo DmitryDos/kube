@@ -67,19 +67,37 @@ class AudioPlayerService: NSObject, ObservableObject {
     }
     
     func load(track: Track) {
-        // Используем playableURL вместо fileURL
-        guard let videoURL = track.playableURL else {
-            print("Video URL not available for track: \(track.title)")
+        if let directURL = track.playableURL {
+            let item = AVPlayerItem(url: directURL)
+            player.replaceCurrentItem(with: item)
+            trackInfo.track = track
+            trackInfo.currentTime = 0
+            trackInfo.progress = 0
+            trackInfo.duration = 0
             return
         }
-        
-        let playerItem = AVPlayerItem(url: videoURL)
-        player.replaceCurrentItem(with: playerItem)
-        
-        trackInfo.track = track
-        trackInfo.currentTime = 0
-        trackInfo.progress = 0
-        trackInfo.duration = 0
+
+        // Если прямого URL нет, запрашиваем presigned URL у API и подставляем в плеер
+        if let videoID = track.remoteVideoId {
+            Task { [weak self] in
+                guard let self = self else { return }
+                do {
+                    let streamURL = try await VideoService.shared.fetchStreamURL(videoID: videoID)
+                    DispatchQueue.main.async {
+                        let item = AVPlayerItem(url: streamURL)
+                        self.player.replaceCurrentItem(with: item)
+                        self.trackInfo.track = track
+                        self.trackInfo.currentTime = 0
+                        self.trackInfo.progress = 0
+                        self.trackInfo.duration = 0
+                    }
+                } catch {
+                    print("Failed to fetch stream URL: \(error)")
+                }
+            }
+        } else {
+            print("Video URL not available for track: \(track.title)")
+        }
     }
     
     func play() {
