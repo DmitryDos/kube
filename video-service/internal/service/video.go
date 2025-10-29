@@ -125,11 +125,12 @@ func (s *VideoService) GetVideoStreamURL(ctx context.Context, objectName string)
 }
 
 // Proxy helpers for streaming
-func (s *VideoService) StatObject(ctx context.Context, objectName string) (interface{ Size int64; ContentType string }, error) {
+func (s *VideoService) StatObject(ctx context.Context, objectName string) (int64, string, error) {
     info, err := s.storage.Stat(ctx, objectName)
-    if err != nil { return nil, err }
-    // return anonymous struct with needed fields
-    return struct{ Size int64; ContentType string }{ Size: info.Size, ContentType: info.ContentType }, nil
+    if err != nil {
+        return 0, "", err
+    }
+    return info.Size, info.ContentType, nil
 }
 
 func (s *VideoService) GetObjectRange(ctx context.Context, objectName string, start, end int64) (io.ReadCloser, error) {

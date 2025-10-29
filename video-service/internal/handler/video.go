@@ -273,11 +273,11 @@ func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
     if err != nil { c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"}); return }
 
     // Stat object
-    info, err := h.service.StatObject(c.Request.Context(), video.FilePath)
+    size, ctype, err := h.service.StatObject(c.Request.Context(), video.FilePath)
     if err != nil { c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to stat object"}); return }
 
-    totalSize := info.Size
-    contentType := info.ContentType
+    totalSize := size
+    contentType := ctype
     if contentType == "" { contentType = "application/octet-stream" }
 
     // Parse Range header
