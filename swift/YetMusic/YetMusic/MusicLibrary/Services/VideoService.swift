@@ -112,6 +112,11 @@ class VideoService: ObservableObject {
         
         return uploadResponse.video
     }
+
+    // Streaming upload from a local file URL using URLSession.uploadTask
+    func uploadVideo(fileURL: URL, title: String, description: String = "") async throws -> Video {
+        return try await UploadService.shared.uploadVideo(fileURL: fileURL, title: title, description: description)
+    }
     
     func loadVideos(page: Int = 0, pageSize: Int = 20, completion: @escaping ([Video]) -> Void) {
         guard let token = getToken() else {

@@ -2,6 +2,7 @@ package storage
 
 import (
     "context"
+    "io"
     "os"
     "fmt"
     "log"
@@ -54,6 +55,17 @@ func (m *MinIOClient) UploadFile(ctx context.Context, objectName string, filePat
         ContentType: "application/octet-stream",
     })
     return err
+}
+
+// UploadReader streams data from the provided reader directly to MinIO.
+// If size is unknown, pass -1 to enable streaming multipart upload.
+func (m *MinIOClient) UploadReader(ctx context.Context, objectName string, reader io.Reader, size int64, contentType string) (int64, error) {
+    opts := minio.PutObjectOptions{ContentType: contentType}
+    info, err := m.client.PutObject(ctx, m.bucket, objectName, reader, size, opts)
+    if err != nil {
+        return 0, err
+    }
+    return info.Size, nil
 }
 
 func (m *MinIOClient) GetFileURL(objectName string) string {

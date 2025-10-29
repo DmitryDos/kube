@@ -2,6 +2,7 @@ package handler
 
 import (
     "net/http"
+    "path/filepath"
     "strconv"
     "video-service/internal/model"
     "video-service/internal/service"
@@ -91,6 +92,79 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
             CreatedAt:   video.CreatedAt,
         },
     })
+}
+
+// UploadVideoRaw streams a raw request body (e.g., video/mp4) directly to storage.
+// Title and description are taken from query params: ?title=...&description=...
+func (h *VideoHandler) UploadVideoRaw(c *gin.Context) {
+    userID, exists := c.Get("userID")
+    if !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+        return
+    }
+    userIDInt, ok := userID.(int)
+    if !ok {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID type"})
+        return
+    }
+
+    title := c.Query("title")
+    description := c.Query("description")
+    if title == "" {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Title is required"})
+        return
+    }
+
+    contentType := c.GetHeader("Content-Type")
+    if contentType == "" {
+        contentType = "application/octet-stream"
+    }
+
+    // Derive a pseudo filename from content type
+    filename := "upload" + extFromContentType(contentType)
+
+    req := model.CreateVideoRequest{
+        Title:       title,
+        Description: description,
+    }
+
+    video, err := h.service.CreateVideoStream(userIDInt, &req, c.Request.Body, filename, -1, contentType)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create video"})
+        return
+    }
+
+    ctx := c.Request.Context()
+    presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
+    if err != nil {
+        presignedURL = ""
+    }
+
+    c.JSON(http.StatusCreated, gin.H{
+        "message": "Video uploaded successfully",
+        "video": model.VideoResponse{
+            ID:          video.ID,
+            Title:       video.Title,
+            Description: video.Description,
+            FileSize:    video.FileSize,
+            FileURL:     presignedURL,
+            Status:      video.Status,
+            CreatedAt:   video.CreatedAt,
+        },
+    })
+}
+
+func extFromContentType(ct string) string {
+    switch ct {
+    case "video/mp4":
+        return ".mp4"
+    case "video/quicktime":
+        return ".mov"
+    case "video/x-matroska":
+        return ".mkv"
+    default:
+        return filepath.Ext(ct) // likely empty; kept for future mapping
+    }
 }
 
 func (h *VideoHandler) GetVideos(c *gin.Context) {

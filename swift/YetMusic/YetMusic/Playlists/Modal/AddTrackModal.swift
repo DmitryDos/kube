@@ -170,32 +170,44 @@ struct AddTrackModal: View {
     }
 
     private func saveTrack() {
-        guard let mediaURL = downloadedURL ?? selectedFileURL else { return }
-        
-        isLoading = true
-        errorMessage = nil
-        
-        Task {
-            do {
-                let videoData = try Data(contentsOf: mediaURL)
-                _ = try await TrackController.shared.uploadVideo(
-                    videoData,
-                    title: trackTitle,
-                    artist: trackArtist.isEmpty ? "Unknown" : trackArtist
-                )
-                
-                await MainActor.run {
-                    isLoading = false
-                    ModalProvider.shared.dismiss()
-                }
-                
-            } catch {
-                await MainActor.run {
-                    errorMessage = "Ошибка загрузки видео: \(error.localizedDescription)"
-                    isLoading = false
+        // Приоритет: локальный файл -> фоновая загрузка
+        if let fileURL = selectedFileURL {
+            BackgroundUploadService.shared.enqueueUpload(
+                fileURL: fileURL,
+                title: trackTitle,
+                description: trackArtist.isEmpty ? "Unknown" : trackArtist
+            )
+            ModalProvider.shared.dismiss()
+            return
+        }
+
+        // Если был получен URL из парсера и он локальный файл — загрузим стримом
+        if let mediaURL = downloadedURL, mediaURL.isFileURL {
+            isLoading = true
+            errorMessage = nil
+            Task {
+                do {
+                    let _ = try await UploadService.shared.uploadVideo(
+                        fileURL: mediaURL,
+                        title: trackTitle,
+                        description: trackArtist.isEmpty ? "Unknown" : trackArtist
+                    )
+                    await MainActor.run {
+                        isLoading = false
+                        ModalProvider.shared.dismiss()
+                    }
+                } catch {
+                    await MainActor.run {
+                        errorMessage = "Ошибка загрузки видео: \(error.localizedDescription)"
+                        isLoading = false
+                    }
                 }
             }
+            return
         }
+
+        // Иначе — сообщаем, что нужен локальный файл для загрузки
+        errorMessage = "Выберите файл для загрузки"
     }
     
     private func handleFileImport(_ result: Result<[URL], Error>) {
