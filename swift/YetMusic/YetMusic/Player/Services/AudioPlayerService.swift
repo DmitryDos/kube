@@ -67,37 +67,25 @@ class AudioPlayerService: NSObject, ObservableObject {
     }
     
     func load(track: Track) {
-        if let directURL = track.playableURL {
-            let item = AVPlayerItem(url: directURL)
-            player.replaceCurrentItem(with: item)
-            trackInfo.track = track
-            trackInfo.currentTime = 0
-            trackInfo.progress = 0
-            trackInfo.duration = 0
+        guard let videoID = track.remoteVideoId else {
+            print("Video ID not available for track: \(track.title)")
             return
         }
 
-        // Если прямого URL нет, запрашиваем presigned URL у API и подставляем в плеер
-        if let videoID = track.remoteVideoId {
-            Task { [weak self] in
-                guard let self = self else { return }
-                do {
-                    let streamURL = try await VideoService.shared.fetchStreamURL(videoID: videoID)
-                    DispatchQueue.main.async {
-                        let item = AVPlayerItem(url: streamURL)
-                        self.player.replaceCurrentItem(with: item)
-                        self.trackInfo.track = track
-                        self.trackInfo.currentTime = 0
-                        self.trackInfo.progress = 0
-                        self.trackInfo.duration = 0
-                    }
-                } catch {
-                    print("Failed to fetch stream URL: \(error)")
-                }
-            }
-        } else {
-            print("Video URL not available for track: \(track.title)")
-        }
+        // Стримим через API Gateway proxy с JWT заголовком
+        let base = VideoService.shared.baseURL
+        guard let url = URL(string: base + "/api/videos/\(videoID)/stream/proxy") else { return }
+        guard let token = UserDefaults.standard.string(forKey: "authToken") else { return }
+
+        let headers = ["Authorization": "Bearer \(token)"]
+        let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+        let item = AVPlayerItem(asset: asset)
+        player.replaceCurrentItem(with: item)
+        
+        trackInfo.track = track
+        trackInfo.currentTime = 0
+        trackInfo.progress = 0
+        trackInfo.duration = 0
     }
     
     func play() {

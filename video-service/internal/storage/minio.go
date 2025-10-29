@@ -87,6 +87,25 @@ func (m *MinIOClient) DeleteFile(ctx context.Context, objectName string) error {
     return m.client.RemoveObject(ctx, m.bucket, objectName, minio.RemoveObjectOptions{})
 }
 
+// Stat returns object metadata including size and content-type
+func (m *MinIOClient) Stat(ctx context.Context, objectName string) (minio.ObjectInfo, error) {
+    return m.client.StatObject(ctx, m.bucket, objectName, minio.StatObjectOptions{})
+}
+
+// GetObjectRange returns a reader for the specified byte range [start, end].
+// If end < 0, the range is from start to the end of the object.
+func (m *MinIOClient) GetObjectRange(ctx context.Context, objectName string, start, end int64) (*minio.Object, error) {
+    opts := minio.GetObjectOptions{}
+    if start >= 0 {
+        if end >= 0 {
+            if err := opts.SetRange(start, end); err != nil { return nil, err }
+        } else {
+            if err := opts.SetRange(start, 0); err != nil { return nil, err }
+        }
+    }
+    return m.client.GetObject(ctx, m.bucket, objectName, opts)
+}
+
 func getEnv(key, defaultValue string) string {
     if value := os.Getenv(key); value != "" {
         return value

@@ -124,6 +124,20 @@ func (s *VideoService) GetVideoStreamURL(ctx context.Context, objectName string)
     return s.storage.GeneratePresignedURL(ctx, objectName)
 }
 
+// Proxy helpers for streaming
+func (s *VideoService) StatObject(ctx context.Context, objectName string) (interface{ Size int64; ContentType string }, error) {
+    info, err := s.storage.Stat(ctx, objectName)
+    if err != nil { return nil, err }
+    // return anonymous struct with needed fields
+    return struct{ Size int64; ContentType string }{ Size: info.Size, ContentType: info.ContentType }, nil
+}
+
+func (s *VideoService) GetObjectRange(ctx context.Context, objectName string, start, end int64) (io.ReadCloser, error) {
+    obj, err := s.storage.GetObjectRange(ctx, objectName, start, end)
+    if err != nil { return nil, err }
+    return obj, nil
+}
+
 // CreateVideoStream uploads the provided reader directly to storage and creates a DB record.
 // If size is unknown, pass size = -1 and a suitable contentType (e.g., "video/mp4").
 func (s *VideoService) CreateVideoStream(userID int, req *model.CreateVideoRequest, reader io.Reader, filename string, size int64, contentType string) (*model.Video, error) {

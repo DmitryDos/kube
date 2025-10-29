@@ -18,6 +18,7 @@ class TrackController: ObservableObject {
         self.repository = TrackRepository()
         loadFirstPage()
         setupVideoObserver()
+        observeAuthState()
     }
     
     private func setupVideoObserver() {
@@ -54,6 +55,20 @@ class TrackController: ObservableObject {
                         return !remoteVideos.contains(where: { $0.id == remoteVideoId })
                     }
                     return false // Локальные треки не удаляем
+                }
+            }
+            .store(in: &cancellables)
+    }
+
+    private func observeAuthState() {
+        AuthService.shared.$isAuthenticated
+            .receive(on: RunLoop.main)
+            .sink { [weak self] isAuth in
+                guard let self = self else { return }
+                if isAuth {
+                    self.loadFirstPage()
+                } else {
+                    self.tracks = []
                 }
             }
             .store(in: &cancellables)

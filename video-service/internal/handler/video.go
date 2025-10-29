@@ -1,8 +1,10 @@
 package handler
 
 import (
+    "io"
     "net/http"
     "path/filepath"
+    "regexp"
     "strconv"
     "video-service/internal/model"
     "video-service/internal/service"
@@ -256,4 +258,70 @@ func (h *VideoHandler) GetStreamURL(c *gin.Context) {
     }
 
     c.JSON(http.StatusOK, gin.H{"url": presignedURL})
+}
+
+// StreamVideoProxy streams content through API (supports Range), so clients go via gateway.
+func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
+    userID, exists := c.Get("userID")
+    if !exists { c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"}); return }
+    userIDInt := userID.(int)
+
+    videoID, err := strconv.Atoi(c.Param("id"))
+    if err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"}); return }
+
+    video, err := h.service.GetVideo(userIDInt, videoID)
+    if err != nil { c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"}); return }
+
+    // Stat object
+    info, err := h.service.StatObject(c.Request.Context(), video.FilePath)
+    if err != nil { c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to stat object"}); return }
+
+    totalSize := info.Size
+    contentType := info.ContentType
+    if contentType == "" { contentType = "application/octet-stream" }
+
+    // Parse Range header
+    rangeHeader := c.GetHeader("Range")
+    var start int64 = 0
+    var end int64 = -1
+    status := http.StatusOK
+    if rangeHeader != "" {
+        // bytes=start-end
+        re := regexp.MustCompile(`bytes=(\d+)-(\d*)`)
+        if m := re.FindStringSubmatch(rangeHeader); len(m) == 3 {
+            if s, err := strconv.ParseInt(m[1], 10, 64); err == nil { start = s }
+            if m[2] != "" { if e, err := strconv.ParseInt(m[2], 10, 64); err == nil { end = e } }
+            if end >= 0 && end >= totalSize { end = totalSize - 1 }
+            status = http.StatusPartialContent
+        }
+    }
+
+    obj, err := h.service.GetObjectRange(c.Request.Context(), video.FilePath, start, end)
+    if err != nil { c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read object"}); return }
+    defer obj.Close()
+
+    // Headers
+    c.Header("Accept-Ranges", "bytes")
+    c.Header("Content-Type", contentType)
+    if status == http.StatusPartialContent {
+        var contentLen int64
+        if end >= 0 {
+            contentLen = end - start + 1
+            c.Header("Content-Range", "bytes "+strconv.FormatInt(start,10)+"-"+strconv.FormatInt(end,10)+"/"+strconv.FormatInt(totalSize,10))
+        } else {
+            contentLen = totalSize - start
+            c.Header("Content-Range", "bytes "+strconv.FormatInt(start,10)+"-"+strconv.FormatInt(totalSize-1,10)+"/"+strconv.FormatInt(totalSize,10))
+        }
+        c.Header("Content-Length", strconv.FormatInt(contentLen, 10))
+        c.Status(http.StatusPartialContent)
+    } else {
+        c.Header("Content-Length", strconv.FormatInt(totalSize, 10))
+        c.Status(http.StatusOK)
+    }
+
+    // Stream copy
+    if _, err := io.Copy(c.Writer, obj); err != nil {
+        // client aborted or network error; nothing special to do
+        return
+    }
 }
