@@ -56,11 +56,25 @@ final class UploadService {
             throw VideoError.serverError(statusCode: httpResponse.statusCode)
         }
 
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = makeDecoder()
         let uploadResponse = try decoder.decode(UploadResponse.self, from: data)
         return uploadResponse.video
     }
 }
-
+// Reuse same tolerant date decoder as VideoService
+private func makeDecoder() -> JSONDecoder {
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .custom { decoder in
+        let container = try decoder.singleValueContainer()
+        let dateString = try container.decode(String.self)
+        let fmt1 = ISO8601DateFormatter()
+        fmt1.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = fmt1.date(from: dateString) { return d }
+        let fmt2 = ISO8601DateFormatter()
+        fmt2.formatOptions = [.withInternetDateTime]
+        if let d = fmt2.date(from: dateString) { return d }
+        throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date: \(dateString)")
+    }
+    return decoder
+}
 

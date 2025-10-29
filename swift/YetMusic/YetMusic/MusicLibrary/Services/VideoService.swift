@@ -96,8 +96,7 @@ class VideoService: ObservableObject {
             throw VideoError.serverError(statusCode: httpResponse.statusCode)
         }
         
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
+        let decoder = makeDecoder()
         
         struct UploadResponse: Codable {
             let message: String
@@ -183,6 +182,9 @@ class VideoService: ObservableObject {
             }
             
             guard (200...299).contains(httpResponse.statusCode) else {
+                if let data = data, let raw = String(data: data, encoding: .utf8) {
+                    print("[VideoService] Server error (\(httpResponse.statusCode)): \n\(raw)")
+                }
                 let statusError = VideoError.serverError(statusCode: httpResponse.statusCode)
                 completion(.failure(statusError))
                 return
@@ -194,11 +196,13 @@ class VideoService: ObservableObject {
             }
             
             do {
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
+                let decoder = makeDecoder()
                 let decodedResponse = try decoder.decode(T.self, from: data)
                 completion(.success(decodedResponse))
             } catch {
+                if let data = data, let raw = String(data: data, encoding: .utf8) {
+                    print("[VideoService] Decode error: \(error)\nRaw: \n\(raw)")
+                }
                 completion(.failure(error))
             }
         }.resume()
@@ -231,6 +235,23 @@ class VideoService: ObservableObject {
         
         return body
     }
+}
+
+// MARK: - Decoder helper
+private func makeDecoder() -> JSONDecoder {
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .custom { decoder in
+        let container = try decoder.singleValueContainer()
+        let dateString = try container.decode(String.self)
+        let fmt1 = ISO8601DateFormatter()
+        fmt1.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = fmt1.date(from: dateString) { return d }
+        let fmt2 = ISO8601DateFormatter()
+        fmt2.formatOptions = [.withInternetDateTime]
+        if let d = fmt2.date(from: dateString) { return d }
+        throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date: \(dateString)")
+    }
+    return decoder
 }
 
 enum VideoError: LocalizedError {
