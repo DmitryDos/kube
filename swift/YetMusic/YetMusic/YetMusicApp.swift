@@ -109,6 +109,11 @@ struct MainContentView: View {
                 isExpanded: $isMenuExpanded,
                 isLandscape: orientation.isLandscape,
                 currentPage: current)
+            .overlay(alignment: .topLeading) {
+                VideoLoaderButton()
+                    .padding(.leading, 12)
+                    .padding(.top, 12)
+            }
             .ignoresSafeArea(.all, edges: [.top, .bottom])
             .modifier(IgnoreSafeAreaWhenLandscape(isLandscape: orientation.isLandscape && current == 0))
         }
