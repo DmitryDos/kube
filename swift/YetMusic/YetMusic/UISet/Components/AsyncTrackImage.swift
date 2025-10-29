@@ -76,6 +76,18 @@ struct AsyncTrackImage: View {
         else if let videoURL = track.playableURL {
             generateThumbnail(from: videoURL)
         }
+        // Если URL недоступен, но есть remote id — пробуем через proxy c JWT
+        else if let videoID = track.remoteVideoId {
+            let base = VideoService.shared.baseURL
+            if let url = URL(string: base + "/api/videos/\(videoID)/stream/proxy"),
+               let token = UserDefaults.standard.string(forKey: "authToken") {
+                let headers = ["Authorization": "Bearer \(token)"]
+                let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+                generateThumbnail(from: asset)
+            } else {
+                isLoading = false
+            }
+        }
         // Если нет URL для видео - показываем иконку
         else {
             isLoading = false

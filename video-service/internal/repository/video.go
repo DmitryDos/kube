@@ -106,3 +106,8 @@ func (r *VideoRepository) FindByID(id int) (*model.Video, error) {
 
     return &video, nil
 }
+
+func (r *VideoRepository) DeleteByID(id int) error {
+    _, err := r.db.Exec("DELETE FROM videos WHERE id = $1", id)
+    return err
+}

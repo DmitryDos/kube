@@ -72,6 +72,7 @@ func main() {
         protected.GET("/:id/stream", videoHandler.StreamVideo)
         protected.GET("/:id/stream/url", videoHandler.GetStreamURL)
         protected.GET("/:id/stream/proxy", videoHandler.StreamVideoProxy)
+        protected.DELETE("/:id", videoHandler.DeleteVideo)
     }
 
     port := ":3001"

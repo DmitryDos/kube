@@ -139,6 +139,15 @@ func (s *VideoService) GetObjectRange(ctx context.Context, objectName string, st
     return obj, nil
 }
 
+func (s *VideoService) DeleteVideo(userID, videoID int) error {
+    video, err := s.repo.FindByID(videoID)
+    if err != nil { return err }
+    if video.UserID != userID { return errors.New("video not found") }
+    ctx := context.Background()
+    _ = s.storage.DeleteFile(ctx, video.FilePath)
+    return s.repo.DeleteByID(videoID)
+}
+
 // CreateVideoStream uploads the provided reader directly to storage and creates a DB record.
 // If size is unknown, pass size = -1 and a suitable contentType (e.g., "video/mp4").
 func (s *VideoService) CreateVideoStream(userID int, req *model.CreateVideoRequest, reader io.Reader, filename string, size int64, contentType string) (*model.Video, error) {

@@ -48,7 +48,14 @@ struct FullPlayerView: View {
                     }
                     .padding(.bottom, 20)
                     
-                    playerView
+                    ZStack {
+                        playerView
+                        if audio.trackInfo.isBuffering {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                                .scaleEffect(1.4)
+                        }
+                    }
                         .frame(width: geo.size.width - 48,
                                height: (geo.size.width - 42) * 9/16)
                         .appBackground()
@@ -147,7 +154,20 @@ struct FullPlayerView: View {
     // MARK: progress
     private var progress: some View {
         VStack(spacing: 3) {
-            Slider(
+            ZStack(alignment: .leading) {
+                GeometryReader { geo in
+                    Capsule()
+                        .fill(themeObserver.darkColor.opacity(0.25))
+                        .frame(height: 3)
+                    Capsule()
+                        .fill(themeObserver.darkColor.opacity(0.55))
+                        .frame(width: max(0, CGFloat(audio.trackInfo.bufferedProgress)) * (geo.size.width - 46), height: 3)
+                        .animation(.linear(duration: 0.1), value: audio.trackInfo.bufferedProgress)
+                        .padding(.leading, 23)
+                }
+                .frame(height: 3)
+
+                Slider(
                         value: Binding(
                             get: { audio.trackInfo.progress },
                             set: {
@@ -166,8 +186,9 @@ struct FullPlayerView: View {
                             }
                         }
                     )
-            .tint(themeObserver.darkColor)
-            .padding(.horizontal, 23)
+                .tint(themeObserver.darkColor)
+                .padding(.horizontal, 23)
+            }
 
             HStack {
                 Text(format(audio.trackInfo.currentTime))
@@ -190,7 +211,20 @@ struct FullPlayerView: View {
 
     private var progressLandscape: some View {
         VStack(spacing: 4) {
-            Slider(
+            ZStack(alignment: .leading) {
+                GeometryReader { geo in
+                    Capsule()
+                        .fill(Color.white.opacity(0.25))
+                        .frame(height: 3)
+                    Capsule()
+                        .fill(Color.white.opacity(0.55))
+                        .frame(width: max(0, CGFloat(audio.trackInfo.bufferedProgress)) * (geo.size.width - 120), height: 3)
+                        .animation(.linear(duration: 0.1), value: audio.trackInfo.bufferedProgress)
+                        .padding(.leading, 60)
+                }
+                .frame(height: 3)
+
+                Slider(
                         value: Binding(
                             get: { audio.trackInfo.progress },
                             set: {
@@ -209,8 +243,9 @@ struct FullPlayerView: View {
                             }
                         }
                     )
-            .tint(themeObserver.darkTextColor)
-                .padding(.horizontal, 60)
+                .tint(themeObserver.darkTextColor)
+                    .padding(.horizontal, 60)
+            }
             HStack {
                 Text(format(audio.trackInfo.currentTime))
                 Spacer()

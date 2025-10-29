@@ -325,3 +325,16 @@ func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
         return
     }
 }
+
+func (h *VideoHandler) DeleteVideo(c *gin.Context) {
+    userID, exists := c.Get("userID")
+    if !exists { c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"}); return }
+    userIDInt := userID.(int)
+    videoID, err := strconv.Atoi(c.Param("id"))
+    if err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"}); return }
+    if err := h.service.DeleteVideo(userIDInt, videoID); err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete video"})
+        return
+    }
+    c.Status(http.StatusNoContent)
+}

@@ -73,6 +73,18 @@ class VideoService: ObservableObject {
         guard let finalURL = URL(string: decoded.url) else { throw VideoError.invalidURL }
         return finalURL
     }
+
+    func deleteVideo(videoID: Int) async throws {
+        guard let token = getToken() else { throw VideoError.unauthorized }
+        guard let url = URL(string: baseURL + "/api/videos/\(videoID)") else { throw VideoError.invalidURL }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw VideoError.invalidResponse
+        }
+    }
     
     private func getToken() -> String? {
         UserDefaults.standard.string(forKey: tokenKey)

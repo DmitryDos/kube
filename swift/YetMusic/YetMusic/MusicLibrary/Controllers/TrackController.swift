@@ -153,11 +153,12 @@ class TrackController: ObservableObject {
     }
     
     func deleteTrack(_ track: Track) throws {
-        if track.isRemoteVideo {
-            // TODO: Реализовать удаление на сервере
-            print("Удаление видео с сервера не реализовано")
+        if track.isRemoteVideo, let videoID = track.remoteVideoId {
+            Task {
+                do { try await VideoService.shared.deleteVideo(videoID: videoID) } catch { print("Failed to delete remote video: \(error)") }
+            }
         }
-        
+
         repository.deleteTrack(track)
         tracks.removeAll { $0.id == track.id }
         objectWillChange.send()
