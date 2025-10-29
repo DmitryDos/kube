@@ -123,3 +123,54 @@ func (s *VideoService) GetVideo(userID, videoID int) (*model.Video, error) {
 func (s *VideoService) GetVideoStreamURL(ctx context.Context, objectName string) (string, error) {
     return s.storage.GeneratePresignedURL(ctx, objectName)
 }
+
+// CreateVideoStream uploads the provided reader directly to storage and creates a DB record.
+// If size is unknown, pass size = -1 and a suitable contentType (e.g., "video/mp4").
+func (s *VideoService) CreateVideoStream(userID int, req *model.CreateVideoRequest, reader io.Reader, filename string, size int64, contentType string) (*model.Video, error) {
+    if req == nil || req.Title == "" {
+        return nil, errors.New("title is required")
+    }
+
+    ext := filepath.Ext(filename)
+    if ext == "" {
+        // Fallback based on content type
+        if contentType == "video/mp4" {
+            ext = ".mp4"
+        } else {
+            ext = ".bin"
+        }
+    }
+
+    hash := md5.Sum([]byte(fmt.Sprintf("%d_%s_%d", userID, filename, time.Now().UnixNano())))
+    fileName := hex.EncodeToString(hash[:]) + ext
+
+    ctx := context.Background()
+    objectName := fmt.Sprintf("user-%d/%s", userID, fileName)
+
+    uploadedSize, err := s.storage.UploadReader(ctx, objectName, reader, size, contentType)
+    if err != nil {
+        return nil, err
+    }
+
+    finalSize := uploadedSize
+    if size > 0 {
+        finalSize = size
+    }
+
+    video := &model.Video{
+        Title:       req.Title,
+        Description: req.Description,
+        FilePath:    objectName,
+        FileSize:    finalSize,
+        UserID:      userID,
+        Status:      "ready",
+    }
+
+    if err := s.repo.Create(video); err != nil {
+        ctx := context.Background()
+        _ = s.storage.DeleteFile(ctx, objectName)
+        return nil, err
+    }
+
+    return video, nil
+}

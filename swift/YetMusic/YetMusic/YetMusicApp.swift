@@ -18,6 +18,7 @@ extension Notification.Name {
 
 @main
 struct MusicApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @State private var currentPage: Int = 2
 
     var body: some Scene {

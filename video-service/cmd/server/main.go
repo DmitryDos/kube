@@ -67,6 +67,7 @@ func main() {
     protected.Use(handler.AuthenticateJWT())
     {
         protected.POST("/upload", videoHandler.UploadVideo)
+        protected.POST("/upload/raw", videoHandler.UploadVideoRaw)
         protected.GET("/", videoHandler.GetVideos)
         protected.GET("/:id/stream", videoHandler.StreamVideo)
     }
