@@ -98,15 +98,15 @@ class AudioPlayerService: NSObject, ObservableObject {
         itemObservers.removeAll()
 
         // Buffering state
-        let obs1 = item.observe(\._playbackBufferEmpty, options: [.new]) { [weak self] item, change in
+        let obs1 = item.observe(\.isPlaybackBufferEmpty, options: [.new]) { [weak self] item, change in
             DispatchQueue.main.async { self?.trackInfo.isBuffering = item.isPlaybackBufferEmpty }
         }
         // Likely to keep up
-        let obs2 = item.observe(\._playbackLikelyToKeepUp, options: [.new]) { [weak self] item, change in
+        let obs2 = item.observe(\.isPlaybackLikelyToKeepUp, options: [.new]) { [weak self] item, change in
             DispatchQueue.main.async { self?.trackInfo.isBuffering = !item.isPlaybackLikelyToKeepUp }
         }
         // Loaded time ranges → buffered progress
-        let obs3 = item.observe(\._loadedTimeRanges, options: [.new]) { [weak self] item, change in
+        let obs3 = item.observe(\.loadedTimeRanges, options: [.new]) { [weak self] item, change in
             guard let self = self else { return }
             let ranges = item.loadedTimeRanges
             guard let timeRange = ranges.first?.timeRangeValue else { return }

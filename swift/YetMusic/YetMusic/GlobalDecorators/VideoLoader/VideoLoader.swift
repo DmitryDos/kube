@@ -1,16 +1,48 @@
 import SwiftUI
 
-struct VideoLoaderButton: View {
+struct VideoLoaderMenu: View {
+    @ObservedObject private var themeObserver = ThemeObserver.shared
+    @Environment(\.isLandscape) private var isLandscape
+
+    @Binding var isExpanded: Bool
+    @ObservedObject private var modalProvider = ModalProvider.shared
+    
     var body: some View {
-        Button(action: { ModalProvider.shared.show(VideoLoaderModal()) }) {
-            Image(systemName: "tray.full")
-                .font(.system(size: 16, weight: .bold))
-                .padding(10)
-                .background(Color(.systemBackground).opacity(0.8))
-                .clipShape(Circle())
-                .shadow(radius: 4)
+        VStack(alignment: .leading, spacing: 12) {
+            if !isExpanded {
+                Button(action: {
+                    withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
+                        openMenu()
+                        isExpanded = true
+                    }
+                }) {
+                    ZStack {
+                        Image(systemName: "tray.full")
+                            .font(.system(size: 28))
+                            .foregroundColor(themeObserver.themedAccentColor)
+                            .frame(width: 50, height: 50)
+                            .background(themeObserver.contrastColor)
+                            .cornerRadius(12)
+                    }
+                }
+                .buttonStyle(PlainButtonStyle())
+                .transition(.scale.combined(with: .opacity))
+            }
         }
-        .accessibilityLabel("Стриминг файлов")
+        .padding(.top, isLandscape ? 16 : 60)
+        .padding(.leading, 16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private func openMenu() {
+        modalProvider.show(
+            VideoLoaderModal(),
+            onClose: {
+                withAnimation {
+                    isExpanded = false
+                }
+            }
+        )
     }
 }
 

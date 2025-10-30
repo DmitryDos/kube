@@ -229,7 +229,7 @@ class VideoService: ObservableObject {
                 let decodedResponse = try decoder.decode(T.self, from: data)
                 completion(.success(decodedResponse))
             } catch {
-                if let data = data, let raw = String(data: data, encoding: .utf8) {
+                if let raw = String(data: data, encoding: .utf8) {
                     print("[VideoService] Decode error: \(error)\nRaw: \n\(raw)")
                 }
                 completion(.failure(error))

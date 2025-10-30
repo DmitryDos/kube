@@ -110,9 +110,7 @@ struct PlaylistsView: View {
     var body: some View {
         ZStack {
             VStack(spacing: 0) {
-                // Выносим searchBar в отдельную переменную
                 searchBar
-                // Выносим scrollContent в отдельную переменную
                 scrollContent
             }
         }
@@ -132,8 +130,7 @@ struct PlaylistsView: View {
             .background(themeObserver.lightGlassColor)
             .cornerRadius(50)
         }
-        .padding(.leading, 16)
-        .padding(.trailing, 78)
+        .padding(.horizontal, 78)
         .padding(.top, isLandscape ? 32 : 8)
         .padding(.bottom, 8)
     }

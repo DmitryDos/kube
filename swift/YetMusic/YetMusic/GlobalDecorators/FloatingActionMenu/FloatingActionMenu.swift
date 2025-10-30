@@ -37,7 +37,7 @@ struct FloatingActionMenu: View {
 
     private func openMenu() {
         modalProvider.show(
-            FloatingActionMenuModal(buttons: buttons, isExpanded: $isExpanded),
+            FloatingActionMenuModal(buttons: buttons),
             onClose: {
                 withAnimation {
                     isExpanded = false
@@ -59,6 +59,8 @@ struct WithFloatingMenuModifier: ViewModifier {
             Group {
                 if !(isLandscape && currentPage == 0) {
                     FloatingActionMenu(buttons: buttons, isExpanded: $isExpanded)
+                        .zIndex(9999)
+                    VideoLoaderMenu(isExpanded: $isExpanded)
                         .zIndex(9999)
                 }
             }

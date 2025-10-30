@@ -3,8 +3,6 @@ import SwiftUI
 struct FloatingActionMenuModal: View {
     @ObservedObject private var themeObserver = ThemeObserver.shared
     let buttons: [ActionButton]
-    @ObservedObject private var modalProvider = ModalProvider.shared
-    @Binding var isExpanded: Bool
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 12) {
@@ -28,10 +26,6 @@ struct FloatingActionMenuModal: View {
             .overlay(ModalMarkerView().allowsHitTesting(false))
             .background(themeObserver.secondaryGlassColor)
             .cornerRadius(16)
-            .shadow(radius: 6)
-            .opacity(isExpanded ? 1 : 0)
-            .scaleEffect(isExpanded ? 1 : 0.85)
-            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: isExpanded)
         }
         .padding(.top, 60)
         .padding(.trailing, 20)
