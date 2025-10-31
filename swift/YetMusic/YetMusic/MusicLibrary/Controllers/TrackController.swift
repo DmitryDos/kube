@@ -41,10 +41,12 @@ class TrackController: ObservableObject {
                 // Обновляем или добавляем новые треки
                 for remoteTrack in remoteTracks {
                     if let index = self.tracks.firstIndex(where: { $0.remoteVideoId == remoteTrack.remoteVideoId }) {
-                        // Обновляем существующий трек
+                        // Сохраняем локальные поля при обновлении
+                        let existing = self.tracks[index]
+                        remoteTrack.isSaved = existing.isSaved
+                        remoteTrack.localFilePath = existing.localFilePath
                         self.tracks[index] = remoteTrack
                     } else {
-                        // Добавляем новый трек
                         self.tracks.append(remoteTrack)
                     }
                 }

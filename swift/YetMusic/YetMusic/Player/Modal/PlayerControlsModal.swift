@@ -4,6 +4,7 @@ struct PlayerControlsModal: View {
     @ObservedObject private var audio = AudioPlayerService.shared
     @ObservedObject private var themeObserver = ThemeObserver.shared
     @State private var showingShareSheet = false
+    @ObservedObject private var playlistService = PlaylistService.shared
     
     let queueService = QueueService.shared
 
@@ -44,9 +45,11 @@ struct PlayerControlsModal: View {
                     HStack(spacing: 6) {
                         GlassBlock {
                             Button(action: {
-                                // TODO: Логика лайка
+                                if let track = audio.trackInfo.track {
+                                    playlistService.toggleLike(track: track)
+                                }
                             }) {
-                                Image(systemName: "heart")
+                                Image(systemName: likeIconName)
                                     .font(.system(size: 18))
                                     .foregroundColor(themeObserver.textColor)
                                     .frame(width: 30, height: 30)
@@ -64,6 +67,17 @@ struct PlayerControlsModal: View {
                             }
                         }
                         
+                        GlassBlock {
+                            Button(action: {
+                                ModalProvider.shared.show(SearchDockModal())
+                            }) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 18))
+                                    .foregroundColor(themeObserver.textColor)
+                                    .frame(width: 30, height: 30)
+                            }
+                        }
+                        
                         Spacer()
                     }
                 }
@@ -73,7 +87,7 @@ struct PlayerControlsModal: View {
                 HStack(alignment: .bottom) {
                     GlassBlock {
                         Button(action: {
-                            // TODO: Логика "Смотрите также"
+                            // Зарезервировано под рекомендации
                         }) {
                             VStack(spacing: 6) {
                                 Image(systemName: "eye")
@@ -95,35 +109,42 @@ struct PlayerControlsModal: View {
                     GlassBlock {
                         VStack(spacing: 0) {
                             VStack(spacing: 6) {
-                                ZStack(alignment: .leading) {
-                                    Capsule()
-                                        .fill(themeObserver.textColor.opacity(0.25))
-                                        .frame(height: 4)
-                                    
-                                    Capsule()
-                                        .fill(themeObserver.textColor.opacity(0.55))
-                                        .frame(width: max(0, CGFloat(audio.trackInfo.bufferedProgress)) * 250, height: 4)
-                                        .animation(.linear(duration: 0.1), value: audio.trackInfo.bufferedProgress)
-                                    
-                                    Slider(
-                                        value: Binding(
-                                            get: { audio.trackInfo.progress },
-                                            set: {
-                                                audio.seek(to: $0)
+                                GeometryReader { geo in
+                                    ZStack(alignment: .leading) {
+                                        Capsule()
+                                            .fill(themeObserver.textColor.opacity(0.25))
+                                            .frame(height: 4)
+                                        
+                                        let horizontalPadding: CGFloat = 12
+                                        let width = max(0, CGFloat(audio.trackInfo.bufferedProgress)) * max(0, geo.size.width - horizontalPadding * 2)
+                                        Capsule()
+                                            .fill(themeObserver.textColor.opacity(0.55))
+                                            .frame(width: width, height: 4)
+                                            .animation(.linear(duration: 0.1), value: audio.trackInfo.bufferedProgress)
+                                            .offset(x: horizontalPadding)
+                                        
+                                        Slider(
+                                            value: Binding(
+                                                get: { audio.trackInfo.progress },
+                                                set: {
+                                                    audio.seek(to: $0)
+                                                }
+                                            ),
+                                            in: 0...1,
+                                            onEditingChanged: { editing in
+                                                if editing {
+                                                    audio.startSeeking()
+                                                } else {
+                                                    audio.seek(to: audio.trackInfo.progress)
+                                                    audio.endSeeking()
+                                                }
                                             }
-                                        ),
-                                        in: 0...1,
-                                        onEditingChanged: { editing in
-                                            if editing {
-                                                audio.startSeeking()
-                                            } else {
-                                                audio.seek(to: audio.trackInfo.progress)
-                                                audio.endSeeking()
-                                            }
-                                        }
-                                    )
-                                    .tint(themeObserver.textColor)
+                                        )
+                                        .tint(themeObserver.textColor)
+                                        .padding(.horizontal, horizontalPadding)
+                                    }
                                 }
+                                .frame(height: 14)
                                 
                                 HStack {
                                     Text(format(audio.trackInfo.currentTime))
@@ -175,7 +196,7 @@ struct PlayerControlsModal: View {
                     
                     GlassBlock {
                         Button(action: {
-                            // TODO: Логика очереди
+                            ModalProvider.shared.show(QueueSideModal())
                         }) {
                             VStack(spacing: 6) {
                                 Image(systemName: "list.bullet")
@@ -211,6 +232,15 @@ struct PlayerControlsModal: View {
         let seconds = totalSeconds % 60
         
         return String(format: "%d:%02d", minutes, seconds)
+    }
+}
+
+private extension PlayerControlsModal {
+    var likeIconName: String {
+        if let track = audio.trackInfo.track, playlistService.isTrackLiked(track) {
+            return "heart.fill"
+        }
+        return "heart"
     }
 }
 

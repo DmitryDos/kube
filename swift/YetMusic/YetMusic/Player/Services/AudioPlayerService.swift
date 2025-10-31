@@ -70,21 +70,24 @@ class AudioPlayerService: NSObject, ObservableObject {
     }
     
     func load(track: Track) {
-        guard let videoID = track.remoteVideoId else {
-            print("Video ID not available for track: \(track.title)")
-            return
+        // Локальный приоритет
+        if track.isSaved, let local = track.playableURL {
+            let item = AVPlayerItem(url: local)
+            player.replaceCurrentItem(with: item)
+            observeItem(item)
+        } else if let videoID = track.remoteVideoId {
+            // Стримим через API Gateway proxy с JWT заголовком
+            let base = VideoService.shared.baseURL
+            guard let url = URL(string: base + "/api/videos/\(videoID)/stream/proxy") else { return }
+            guard let token = UserDefaults.standard.string(forKey: "authToken") else { return }
+            let headers = ["Authorization": "Bearer \(token)"]
+            let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+            let item = AVPlayerItem(asset: asset)
+            player.replaceCurrentItem(with: item)
+            observeItem(item)
+            // Запускаем предзагрузку в фоне
+            PreloadService.shared.startPreloading(for: track)
         }
-
-        // Стримим через API Gateway proxy с JWT заголовком
-        let base = VideoService.shared.baseURL
-        guard let url = URL(string: base + "/api/videos/\(videoID)/stream/proxy") else { return }
-        guard let token = UserDefaults.standard.string(forKey: "authToken") else { return }
-
-        let headers = ["Authorization": "Bearer \(token)"]
-        let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
-        let item = AVPlayerItem(asset: asset)
-        player.replaceCurrentItem(with: item)
-        observeItem(item)
         
         trackInfo.track = track
         trackInfo.currentTime = 0

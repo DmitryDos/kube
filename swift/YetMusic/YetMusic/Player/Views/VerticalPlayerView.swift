@@ -108,14 +108,16 @@ struct VerticalPlayerView: View {
         VStack(spacing: 3) {
             ZStack(alignment: .leading) {
                 GeometryReader { geo in
+                    let horizontalPadding: CGFloat = 23
                     Capsule()
                         .fill(themeObserver.darkColor.opacity(0.25))
                         .frame(height: 3)
+                    let width = max(0, CGFloat(audio.trackInfo.bufferedProgress)) * max(0, geo.size.width - horizontalPadding * 2)
                     Capsule()
                         .fill(themeObserver.darkColor.opacity(0.55))
-                        .frame(width: max(0, CGFloat(audio.trackInfo.bufferedProgress)) * (geo.size.width - 46), height: 3)
+                        .frame(width: width, height: 3)
                         .animation(.linear(duration: 0.1), value: audio.trackInfo.bufferedProgress)
-                        .padding(.leading, 23)
+                        .offset(x: horizontalPadding)
                 }
                 .frame(height: 3)
 
