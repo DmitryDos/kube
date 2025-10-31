@@ -76,6 +76,13 @@ struct MainContentView: View {
             ) {
                 ModalProvider.shared.show(AddTrackModal())
             },
+            ActionButton(
+                title: "Загрузка",
+                icon: "tray.full",
+                color: .pink
+            ) {
+                ModalProvider.shared.show(VideoLoaderModal())
+            },
         ]
     }
     
@@ -109,9 +116,9 @@ struct MainContentView: View {
                 isExpanded: $isMenuExpanded,
                 isLandscape: orientation.isLandscape,
                 currentPage: current)
-            .ignoresSafeArea(.all, edges: [.top, .bottom])
-            .modifier(IgnoreSafeAreaWhenLandscape(isLandscape: orientation.isLandscape && current == 0))
         }
+        .modifier(IgnoreSafeAreaWhenLandscape(isLandscape: orientation.isLandscape))
+        .ignoresSafeArea(.all, edges: [.top, .bottom])
         .environment(\.isLandscape, orientation.isLandscape)
         .environment(\.darkTheme, themeObserver.isDarkTheme)
     }

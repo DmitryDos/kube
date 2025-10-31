@@ -17,6 +17,7 @@ struct AsyncTrackImage: View {
     @State private var image: UIImage?
     @State private var isLoading = false
     @State private var downloadTask: URLSessionDataTask?
+    @ObservedObject private var themeObserver = ThemeObserver.shared
 
     init(track: Track, cornerRadius: CGFloat = 8, width: CGFloat? = nil) {
         self.track = track
@@ -28,7 +29,7 @@ struct AsyncTrackImage: View {
         GeometryReader { geometry in
             ZStack {
                 Rectangle()
-                    .fill(Color.gray.opacity(0.3))
+                    .fill(themeObserver.contrastColor)
                     .frame(width: geometry.size.width, height: geometry.size.height)
                 
                 Group {

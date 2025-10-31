@@ -22,7 +22,7 @@ struct PlaylistTrackView: View {
         ZStack(alignment: .bottom) {
             AsyncTrackImage(
                 track: track,
-                cornerRadius: 14
+                cornerRadius: 10
             )
 
             if isEditingMode {

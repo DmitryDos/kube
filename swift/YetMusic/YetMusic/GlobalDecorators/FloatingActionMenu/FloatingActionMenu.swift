@@ -60,8 +60,6 @@ struct WithFloatingMenuModifier: ViewModifier {
                 if !(isLandscape && currentPage == 0) {
                     FloatingActionMenu(buttons: buttons, isExpanded: $isExpanded)
                         .zIndex(9999)
-                    VideoLoaderMenu(isExpanded: $isExpanded)
-                        .zIndex(9999)
                 }
             }
         )

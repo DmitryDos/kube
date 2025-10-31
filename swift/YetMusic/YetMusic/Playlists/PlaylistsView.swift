@@ -114,6 +114,7 @@ struct PlaylistsView: View {
                 scrollContent
             }
         }
+        .padding(.horizontal, isLandscape ? 42 : 0)
     }
 
     private var searchBar: some View {
@@ -130,8 +131,9 @@ struct PlaylistsView: View {
             .background(themeObserver.lightGlassColor)
             .cornerRadius(50)
         }
-        .padding(.horizontal, 78)
-        .padding(.top, isLandscape ? 32 : 8)
+        .padding(.leading, 16)
+        .padding(.trailing, isLandscape ? 30 : 78)
+        .padding(.top, isLandscape ? 22 : 6)
         .padding(.bottom, 8)
     }
 

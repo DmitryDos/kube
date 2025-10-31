@@ -7,6 +7,7 @@ class AuthService: ObservableObject {
     @Published var isAuthenticated = false
     @Published var currentUser: User?
     @Published var errorMessage: String?
+    @Environment(\.isLandscape) private var isLandscape
     
     private let baseURL = "https://conversational-zoila-flexuosely.ngrok-free.dev"
     private let tokenKey = "authToken"

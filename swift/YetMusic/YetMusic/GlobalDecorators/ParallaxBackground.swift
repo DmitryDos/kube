@@ -5,7 +5,7 @@ struct ParallaxBackground: View {
     @Binding var scrollOffset: CGFloat
     let totalPages: Int = 4
     let isLandscape: Bool
-
+    
     var body: some View {
         let overlayColor = themeObserver.backgroundColor.opacity(0.6)
         
@@ -16,7 +16,7 @@ struct ParallaxBackground: View {
                 let targetCenterX = pageWidth * 2.5
                 let imageCenterX = totalWidth / 2
                 let centerOffset = targetCenterX - imageCenterX
-
+                
                 ZStack {
                     if let backgroundImage = themeObserver.backgroundImage {
                         backgroundImage
@@ -37,11 +37,11 @@ struct ParallaxBackground: View {
                     }
                     
                     Rectangle()
-                                            .fill(overlayColor)
-                                            .frame(width: totalWidth, height: geo.size.height)
-                                            .offset(x: -scrollOffset * 0.5 - centerOffset)
-                                            .ignoresSafeArea()
-
+                        .fill(overlayColor)
+                        .frame(width: totalWidth, height: geo.size.height)
+                        .offset(x: -scrollOffset * 0.5 - centerOffset)
+                        .ignoresSafeArea()
+                    
                     ParallaxLayerBack(scrollOffset: $scrollOffset, centerOffset: centerOffset, geo: geo, totalWidth: totalWidth / 2)
                     ParallaxLayerMiddle(scrollOffset: $scrollOffset, centerOffset: centerOffset, geo: geo, totalWidth: totalWidth / 1.2)
                     ParallaxLayerFront(scrollOffset: $scrollOffset, centerOffset: centerOffset, geo: geo, totalWidth: totalWidth * 1.2)
@@ -51,22 +51,22 @@ struct ParallaxBackground: View {
                     backgroundImage
                         .resizable()
                         .scaledToFill()
-                        .frame(width: geo.size.width, height: geo.size.height)
+                        .frame(width: geo.size.width + 20, height: geo.size.height + 20)
                         .blur(radius: themeObserver.enableBackgroundBlur ? 10 : 0)
                         .ignoresSafeArea()
                 } else {
                     Image("Background")
                         .resizable()
                         .scaledToFill()
-                        .frame(width: geo.size.width, height: geo.size.height)
+                        .frame(width: geo.size.width + 20, height: geo.size.height + 20)
                         .blur(radius: themeObserver.enableBackgroundBlur ? 10 : 0)
                         .ignoresSafeArea()
                 }
                 
                 Rectangle()
-                                        .fill(overlayColor)
-                                        .frame(width: geo.size.width, height: geo.size.height)
-                                        .ignoresSafeArea()
+                    .fill(overlayColor)
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .ignoresSafeArea()
             }
         }
     }

@@ -15,87 +15,88 @@ struct AuthFormView: View {
     @State private var name = ""
     @State private var isRegistering = false
     
+    @Environment(\.isLandscape) private var isLandscape
+    
     var body: some View {
-        ScrollView {
-            VStack(spacing: 30) {
-                Image(systemName: isRegistering ? "person.crop.circle.badge.plus" : "person.crop.circle")
-                    .font(.system(size: 80))
-                    .foregroundColor(themeObserver.themedAccentColor)
-                
-                Text(isRegistering ? "Регистрация" : "Вход в YetMusic")
-                    .font(.title)
-                    .fontWeight(.bold)
-                    .foregroundColor(themeObserver.themedAccentColor)
+        VStack(spacing: 30) {
+            Image(systemName: isRegistering ? "person.crop.circle.badge.plus" : "person.crop.circle")
+                .font(.system(size: 80))
+                .foregroundColor(themeObserver.themedAccentColor)
+            
+            Text(isRegistering ? "Регистрация" : "Вход в YetMusic")
+                .font(.title)
+                .fontWeight(.bold)
+                .foregroundColor(themeObserver.themedAccentColor)
 
-                VStack(spacing: 20) {
-                    if isRegistering {
-                        CustomTextField(
-                            title: "Имя",
-                            text: $name,
-                            systemImage: "person"
-                        )
-                    }
-                    
+            VStack(spacing: 20) {
+                if isRegistering {
                     CustomTextField(
-                        title: "Email",
-                        text: $email,
-                        systemImage: "envelope",
-                        keyboardType: .emailAddress
+                        title: "Имя",
+                        text: $name,
+                        systemImage: "person"
                     )
-                    
-                    CustomTextField(
-                        title: "Пароль",
-                        text: $password,
-                        systemImage: "lock",
-                        isSecure: true
-                    )
-                    
-                    Button(action: handleAuth) {
-                        HStack {
-                            Spacer()
-                            Text(isRegistering ? "Зарегистрироваться" : "Войти")
-                                .font(.headline)
-                                .foregroundColor(themeObserver.themedAccentColor)
-                            Spacer()
-                        }
-                        .padding()
-                        .background(authButtonColor)
-                        .cornerRadius(12)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 12)
-                                .stroke(themeObserver.themedAccentColor, lineWidth: isFormValid ? 1 : 0)
-                        )
-                    }
-                    .disabled(!isFormValid)
-                    
-                    Button(action: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            isRegistering.toggle()
-                            clearForm()
-                        }
-                    }) {
-                        Text(isRegistering ? "Уже есть аккаунт? Войти" : "Нет аккаунта? Зарегистрироваться")
-                            .font(.subheadline)
-                            .foregroundColor(themeObserver.primaryGlassColor)
-                    }
-                }
-                .padding(.horizontal, 32)
-                
-                if let error = authService.errorMessage {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundColor(.red)
-                        .padding()
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(8)
-                        .padding(.horizontal, 32)
-                        .transition(.opacity)
                 }
                 
-                Spacer()
+                CustomTextField(
+                    title: "Email",
+                    text: $email,
+                    systemImage: "envelope",
+                    keyboardType: .emailAddress
+                )
+                
+                CustomTextField(
+                    title: "Пароль",
+                    text: $password,
+                    systemImage: "lock",
+                    isSecure: true
+                )
+                
+                Button(action: handleAuth) {
+                    HStack {
+                        Spacer()
+                        Text(isRegistering ? "Зарегистрироваться" : "Войти")
+                            .font(.headline)
+                            .foregroundColor(themeObserver.themedAccentColor)
+                        Spacer()
+                    }
+                    .padding()
+                    .background(authButtonColor)
+                    .cornerRadius(12)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(themeObserver.themedAccentColor, lineWidth: isFormValid ? 1 : 0)
+                    )
+                }
+                .disabled(!isFormValid)
+                
+                Button(action: {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        isRegistering.toggle()
+                        clearForm()
+                    }
+                }) {
+                    Text(isRegistering ? "Уже есть аккаунт? Войти" : "Нет аккаунта? Зарегистрироваться")
+                        .font(.subheadline)
+                        .foregroundColor(themeObserver.primaryGlassColor)
+                }
             }
-            .padding(.top, 40)
+            .padding(.horizontal, 32)
+            
+            if let error = authService.errorMessage {
+                Text(error)
+                    .font(.caption)
+                    .foregroundColor(.red)
+                    .padding()
+                    .background(Color.red.opacity(0.1))
+                    .cornerRadius(8)
+                    .padding(.horizontal, 32)
+                    .transition(.opacity)
+            }
+            
+            Spacer()
         }
+        .padding(.horizontal, isLandscape ? 60 : 0)
+        .padding(.top, 20)
     }
     
     private var isFormValid: Bool {

@@ -11,22 +11,25 @@ struct VideoLoaderModal: View {
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 12) {
+            Text("Загрузки")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundColor(themeObserver.textColor)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+            
             LazyVStack(alignment: .trailing, spacing: 12) {
                 ForEach(items) { item in
                     TransferRow(item: item)
                 }
-                
             }
-            .frame(width: .infinity)
-            .padding(16)
-            .overlay(ModalMarkerView().allowsHitTesting(false))
-            .background(themeObserver.secondaryGlassColor)
-            .cornerRadius(16)
+            .frame(width: .infinity, height: 360)
         }
+        .overlay(ModalMarkerView().allowsHitTesting(false))
+        .padding(16)
+        .background(themeObserver.darkColor)
         .padding(.top, 60)
-        .padding(.horizontal, 20)
-        .frame(maxWidth: .infinity, maxHeight: 120, alignment: .topTrailing)
+        .cornerRadius(16)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
     }
 }
-
-
