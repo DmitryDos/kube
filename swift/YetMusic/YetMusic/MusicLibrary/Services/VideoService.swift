@@ -37,12 +37,12 @@ struct CreateVideoRequest: Codable {
 class VideoService: ObservableObject {
     static let shared = VideoService()
     
-    let baseURL = "https://conversational-zoila-flexuosely.ngrok-free.dev"
-    private let tokenKey = "authToken"
+    let baseURL = AppConfig.apiBaseURL
+    private let tokenKey = AppConfig.authTokenKey
     private let session: URLSession = {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 300
-        config.timeoutIntervalForResource = 600
+        config.timeoutIntervalForRequest = AppConfig.requestTimeout
+        config.timeoutIntervalForResource = AppConfig.resourceTimeout
         if #available(iOS 13.0, *) {
             config.allowsExpensiveNetworkAccess = true
             config.allowsConstrainedNetworkAccess = true

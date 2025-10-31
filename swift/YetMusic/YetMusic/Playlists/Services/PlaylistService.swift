@@ -8,55 +8,17 @@ class PlaylistService: ObservableObject {
     static let allMusicPlaylistID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
     
     @Published var playlists: [Playlist] = []
-    private var modelContainer: ModelContainer?
-    private var modelContext: ModelContext?
+    private let modelContainer: ModelContainer
+    private let modelContext: ModelContext
     
     private init() {
-        initializeSwiftData()
+        modelContainer = PersistenceController.shared.container
+        modelContext = PersistenceController.shared.context
         loadPlaylists()
     }
     
-    private func initializeSwiftData() {
-        do {
-            let schema = Schema([Playlist.self, Track.self])
-            let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-            
-            modelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
-            
-            if let container = modelContainer {
-                modelContext = ModelContext(container)
-            } else {
-                throw NSError(domain: "PlaylistService", code: 1, userInfo: [NSLocalizedDescriptionKey: "Failed to create model container"])
-            }
-        } catch {
-            print("❌ Failed to initialize SwiftData: \(error)")
-            // Создаем in-memory контейнер как fallback
-            createInMemoryContainer()
-        }
-    }
-    
-    private func createInMemoryContainer() {
-        do {
-            let schema = Schema([Playlist.self, Track.self])
-            let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: true)
-            
-            modelContainer = try ModelContainer(for: schema, configurations: [modelConfiguration])
-            
-            if let container = modelContainer {
-                modelContext = ModelContext(container)
-                print("✅ Created in-memory SwiftData container")
-            }
-        } catch {
-            print("❌ Failed to create in-memory container: \(error)")
-        }
-    }
-    
     private func loadPlaylists() {
-        guard let context = modelContext else {
-            print("❌ No model context available")
-            createSystemPlaylistsInMemory()
-            return
-        }
+        let context = modelContext
         
         do {
             let descriptor = FetchDescriptor<Playlist>()
@@ -75,10 +37,7 @@ class PlaylistService: ObservableObject {
     }
     
     private func createSystemPlaylists() {
-        guard let context = modelContext else {
-            createSystemPlaylistsInMemory()
-            return
-        }
+        let context = modelContext
         
         let likedPlaylist = Playlist(id: PlaylistService.likedPlaylistID, name: "Понравившееся", isSystem: true)
         let allMusicPlaylist = Playlist(id: PlaylistService.allMusicPlaylistID, name: "Вся музыка", isSystem: true)
@@ -90,7 +49,6 @@ class PlaylistService: ObservableObject {
             playlists = [likedPlaylist, allMusicPlaylist]
             print("✅ Created system playlists in SwiftData")
         } else {
-            // Fallback to in-memory
             createSystemPlaylistsInMemory()
         }
     }
@@ -126,9 +84,7 @@ class PlaylistService: ObservableObject {
     func createPlaylist(name: String) {
         let newPlaylist = Playlist(name: name)
         
-        if let context = modelContext {
-            context.insert(newPlaylist)
-        }
+        modelContext.insert(newPlaylist)
         
         playlists.append(newPlaylist)
         _ = saveContext()
@@ -144,9 +100,7 @@ class PlaylistService: ObservableObject {
         guard let playlist = getPlaylist(by: id),
               !playlist.isSystem else { return }
         
-        if let context = modelContext {
-            context.delete(playlist)
-        }
+        modelContext.delete(playlist)
         
         playlists.removeAll { $0.id == id }
         _ = saveContext()
@@ -182,10 +136,8 @@ class PlaylistService: ObservableObject {
     
     @discardableResult
     private func saveContext() -> Bool {
-        guard let context = modelContext else { return false }
-        
         do {
-            try context.save()
+            try modelContext.save()
             return true
         } catch {
             print("❌ Error saving playlists: \(error)")

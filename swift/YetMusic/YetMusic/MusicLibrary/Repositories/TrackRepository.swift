@@ -6,12 +6,8 @@ class TrackRepository: ObservableObject {
     private let modelContext: ModelContext
     
     init() {
-        do {
-            self.modelContainer = try ModelContainer(for: Track.self)
-            self.modelContext = ModelContext(modelContainer)
-        } catch {
-            fatalError("Failed to initialize SwiftData: \(error)")
-        }
+        self.modelContainer = PersistenceController.shared.container
+        self.modelContext = PersistenceController.shared.context
     }
     
     func getTracks(page: Int, pageSize: Int) -> [Track] {
