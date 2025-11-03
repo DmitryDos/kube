@@ -1,4 +1,5 @@
 import AVKit
+import AVFoundation
 import Combine
 
 class AudioPlayerService: NSObject, ObservableObject {
@@ -90,16 +91,11 @@ class AudioPlayerService: NSObject, ObservableObject {
             let item = AVPlayerItem(url: local)
             player.replaceCurrentItem(with: item)
             observeItem(item)
-        } else if let direct = track.videoURL, let directURL = URL(string: direct) {
-            // Используем пресайненный URL напрямую, если он есть
-            let item = AVPlayerItem(url: directURL)
-            player.replaceCurrentItem(with: item)
-            observeItem(item)
         } else if let videoID = track.remoteVideoId {
             // Стримим через API Gateway proxy с JWT заголовком
             let base = VideoService.shared.baseURL
             guard let url = URL(string: base + "/api/videos/\(videoID)/stream/proxy") else { return }
-            guard let token = UserDefaults.standard.string(forKey: "authToken") else { return }
+            guard let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) else { return }
             let headers = ["Authorization": "Bearer \(token)"]
             let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
             let item = AVPlayerItem(asset: asset)
@@ -107,6 +103,11 @@ class AudioPlayerService: NSObject, ObservableObject {
             observeItem(item)
             // Запускаем предзагрузку в фоне
             PreloadService.shared.startPreloading(for: track)
+        } else if let direct = track.videoURL, let directURL = URL(string: direct) {
+            // Фоллбэк: если proxy недоступен, пробуем presigned URL
+            let item = AVPlayerItem(url: directURL)
+            player.replaceCurrentItem(with: item)
+            observeItem(item)
         }
         
         trackInfo.track = track

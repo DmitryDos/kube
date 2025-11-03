@@ -152,6 +152,13 @@ func (s *VideoService) GetVideo(userID, videoID int) (*model.Video, error) {
     return video, nil
 }
 
+// GetVideoPublic returns video by id without ownership check (for streaming)
+func (s *VideoService) GetVideoPublic(videoID int) (*model.Video, error) {
+    video, err := s.repo.FindByID(videoID)
+    if err != nil { return nil, err }
+    return video, nil
+}
+
 func (s *VideoService) GetVideoStreamURL(ctx context.Context, objectName string) (string, error) {
     return s.storage.GeneratePresignedURL(ctx, objectName)
 }

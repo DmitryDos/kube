@@ -30,6 +30,13 @@ struct QueueView: View {
                         if selectedIsRecent() {
                             let expandedCount = (isStackExpanded ? 1 : 0) + (isQueueExpanded ? 1 : 0)
                             let sectionHeight: CGFloat = expandedCount > 0 ? max(0, (geo.size.height + 50) / CGFloat(expandedCount)) : 0
+
+                            HStack {
+                                MiniSectionHeader(title: "Вы слушали:", isExpanded: $isStackExpanded)
+                                
+                                Spacer()
+                            }
+
                             if isStackExpanded {
                                 StackSectionView(
                                     tracks: stackTracks,
@@ -92,7 +99,6 @@ struct QueueView: View {
 
     private var headerChips: some View {
         HStack(spacing: 8) {
-            MiniSectionHeader(title: "Вы слушали:", isExpanded: $isStackExpanded)
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     headerChip(title: "Недавно", isSelected: selectedIsRecent()) {

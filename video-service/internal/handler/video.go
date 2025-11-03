@@ -237,12 +237,11 @@ func (h *VideoHandler) SearchAllVideos(c *gin.Context) {
 }
 
 func (h *VideoHandler) StreamVideo(c *gin.Context) {
-    userID, exists := c.Get("userID")
+    _, exists := c.Get("userID")
     if !exists {
         c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
         return
     }
-    userIDInt := userID.(int)
 
     videoID, err := strconv.Atoi(c.Param("id"))
     if err != nil {
@@ -250,7 +249,7 @@ func (h *VideoHandler) StreamVideo(c *gin.Context) {
         return
     }
 
-    video, err := h.service.GetVideo(userIDInt, videoID)
+    video, err := h.service.GetVideoPublic(videoID)
     if err != nil {
         c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
         return
@@ -268,12 +267,11 @@ func (h *VideoHandler) StreamVideo(c *gin.Context) {
 
 // GetStreamURL returns a JSON with a presigned URL for the video
 func (h *VideoHandler) GetStreamURL(c *gin.Context) {
-    userID, exists := c.Get("userID")
+    _, exists := c.Get("userID")
     if !exists {
         c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
         return
     }
-    userIDInt := userID.(int)
 
     videoID, err := strconv.Atoi(c.Param("id"))
     if err != nil {
@@ -281,7 +279,7 @@ func (h *VideoHandler) GetStreamURL(c *gin.Context) {
         return
     }
 
-    video, err := h.service.GetVideo(userIDInt, videoID)
+    video, err := h.service.GetVideoPublic(videoID)
     if err != nil {
         c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
         return
@@ -299,14 +297,13 @@ func (h *VideoHandler) GetStreamURL(c *gin.Context) {
 
 // StreamVideoProxy streams content through API (supports Range), so clients go via gateway.
 func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
-    userID, exists := c.Get("userID")
+    _, exists := c.Get("userID")
     if !exists { c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"}); return }
-    userIDInt := userID.(int)
 
     videoID, err := strconv.Atoi(c.Param("id"))
     if err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"}); return }
 
-    video, err := h.service.GetVideo(userIDInt, videoID)
+    video, err := h.service.GetVideoPublic(videoID)
     if err != nil { c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"}); return }
 
     // Stat object
