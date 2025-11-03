@@ -24,6 +24,8 @@ class AudioPlayerService: NSObject, ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     private let queueService = QueueService.shared
+    private let historyService = HistoryService.shared
+    @Published var isAutoPlayEnabled: Bool = true
     
     override init() {
         super.init()
@@ -64,7 +66,20 @@ class AudioPlayerService: NSObject, ObservableObject {
     private func setupPlaybackFinishedHandler() {
         NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)
             .sink { [weak self] _ in
-                self?.playNext()
+                guard let self = self else { return }
+                // Record finished track into history before advancing
+                if let finished = self.trackInfo.track {
+                    self.historyService.recordPlayed(finished)
+                }
+                if self.isAutoPlayEnabled {
+                    self.playNext()
+                } else {
+                    // Stop and clear current
+                    self.player.replaceCurrentItem(with: nil)
+                    self.trackInfo.track = nil
+                    self.trackInfo.isPlaying = false
+                    self.queueService.clearCurrentSelectionAfterFinish()
+                }
             }
             .store(in: &cancellables)
     }
@@ -127,8 +142,8 @@ class AudioPlayerService: NSObject, ObservableObject {
         if trackInfo.track == nil {
             if let currentTrack = queueService.getCurrentTrack() {
                 load(track: currentTrack)
-            } else if let track = queueService.getNextTrack() {
-                queueService.playTrack(track)
+            } else {
+                queueService.playNextTrack()
                 return
             }
         }
@@ -189,17 +204,11 @@ class AudioPlayerService: NSObject, ObservableObject {
     }
     
     func playNext() {
-        if let nextTrack = queueService.moveToNext() {
-            load(track: nextTrack)
-            play()
-        }
+        queueService.playNextTrack()
     }
     
     func playPrevious() {
-        if let prevTrack = queueService.moveToPrevious() {
-            load(track: prevTrack)
-            play()
-        }
+        queueService.playPreviousTrack()
     }
     
     func tryPip() {

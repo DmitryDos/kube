@@ -164,6 +164,9 @@ class TrackController: ObservableObject {
         repository.deleteTrack(track)
         tracks.removeAll { $0.id == track.id }
         objectWillChange.send()
+
+        // Purge from playlists to avoid stale SwiftData references
+        PlaylistService.shared.removeTrackFromAllPlaylists(trackId: track.id)
     }
     
     func updateTrackMetadata(track: Track, newTitle: String, newArtist: String) {

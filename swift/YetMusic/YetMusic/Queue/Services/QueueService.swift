@@ -11,32 +11,60 @@ enum TrackState {
 class QueueService: ObservableObject {
     static let shared = QueueService()
     
-    @Published var currentQueue: [Track] = []       // храним сами треки, а не fileName
-    @Published var wishlistQueue: [Track] = []      // храним сами треки
+    @Published var currentQueue: [Track] = []
+    @Published var wishlistQueue: [Track] = []
     @Published var currentIndex: Int = -1
     @Published var isLooping: Bool = false
     
     private let trackController = TrackController.shared
+    private let historyService = HistoryService.shared
     
     private init() {}
     
     // MARK: - Основные методы
+
+    // MARK: - Валидация ссылок на модели
+    private func purgeInvalid() {
+        let validIds = Set(trackController.tracks.map { $0.id })
+        if !validIds.isEmpty {
+            currentQueue.removeAll { !validIds.contains($0.id) }
+            wishlistQueue.removeAll { !validIds.contains($0.id) }
+            if currentIndex >= currentQueue.count { currentIndex = max(-1, currentQueue.count - 1) }
+        }
+    }
+
+    private func resolve(_ track: Track) -> Track {
+        if let live = trackController.tracks.first(where: { $0.id == track.id }) { return live }
+        return track
+    }
     
     func getRandomTrack() -> Track? {
         return trackController.getRandomTrack()
     }
     
     func playTrack(_ track: Track) {
-        // Убираем из wishlist
+        purgeInvalid()
+        let track = resolve(track)
         wishlistQueue.removeAll { $0.id == track.id }
 
-        // Проверяем есть ли в currentQueue
-        if let index = currentQueue.firstIndex(where: { $0.id == track.id }) {
-            currentIndex = index
-        } else {
-            currentQueue.append(track)
-            currentIndex = currentQueue.count - 1
+        if let current = getCurrentTrack(), current.id == track.id {
+            AudioPlayerService.shared.play()
+            return
         }
+
+        historyService.recordPlayed(track)
+
+        if currentIndex > 0 {
+            let start = max(0, currentIndex - 5)
+            let end = max(0, currentIndex - 1)
+
+            if let dupIndex = currentQueue[start...end].firstIndex(where: { $0.id == track.id }) {
+                currentQueue.remove(at: dupIndex)
+            }
+        }
+
+        currentQueue.append(track)
+        currentIndex = currentQueue.count - 1
 
         AudioPlayerService.shared.load(track: track)
         AudioPlayerService.shared.play()
@@ -49,68 +77,43 @@ class QueueService: ObservableObject {
     }
     
     func addToWishlist(_ track: Track) {
-        if !wishlistQueue.contains(where: { $0.id == track.id }) &&
-           !currentQueue.contains(where: { $0.id == track.id }) {
+        purgeInvalid()
+        let track = resolve(track)
+        if !wishlistQueue.contains(where: { $0.id == track.id }) {
             wishlistQueue.append(track)
         }
     }
     
     func getCurrentTrack() -> Track? {
-        if 0 <= currentIndex && currentIndex < currentQueue.count {
-            return currentQueue[currentIndex]
-        }
+        purgeInvalid()
+        if 0 <= currentIndex && currentIndex < currentQueue.count { return currentQueue[currentIndex] }
         return nil
     }
-    
-    func getNextTrack() -> Track? {
+
+    func playNextTrack() {
         if isLooping, let currentTrack = getCurrentTrack() {
-            return currentTrack
+            playFromStack(index: currentIndex)
         }
 
-        // Следующий в currentQueue
         if currentIndex + 1 < currentQueue.count {
-            return currentQueue[currentIndex + 1]
+            playFromStack(index: currentIndex + 1)
         }
 
-        // Берем из wishlist
         if !wishlistQueue.isEmpty {
             let nextTrack = wishlistQueue.removeFirst()
-            currentQueue.append(nextTrack)
-            return nextTrack
+            playTrack(nextTrack)
         }
 
-        // Случайный трек
         if let randomTrack = getRandomTrack() {
-            currentQueue.append(randomTrack)
-            return randomTrack
+            playTrack(randomTrack)
         }
-        
-        return nil
     }
-    
-    func getPreviousTrack() -> Track? {
+
+    func playPreviousTrack() -> Track? {
         guard currentIndex > 0 else { return nil }
         return currentQueue[currentIndex - 1]
     }
-    
-    func moveToNext() -> Track? {
-        if let nextTrack = getNextTrack() {
-            if !isLooping {
-                currentIndex += 1
-            }
-            return nextTrack
-        }
-        return nil
-    }
-    
-    func moveToPrevious() -> Track? {
-        if let prevTrack = getPreviousTrack() {
-            currentIndex -= 1
-            return prevTrack
-        }
-        return nil
-    }
-    
+
     func toggleLoop() {
         isLooping.toggle()
     }
@@ -124,103 +127,22 @@ class QueueService: ObservableObject {
         wishlistQueue.removeAll()
     }
 
+    func clearCurrentSelectionAfterFinish() {
+        currentIndex = -1
+    }
+
+    func playFromStack(index: Int) {
+        guard 0 <= index && index < currentQueue.count else { return }
+        currentIndex = index
+        let track = currentQueue[index]
+        AudioPlayerService.shared.load(track: track)
+        AudioPlayerService.shared.play()
+    }
+
     func removeTrackFromQueues(_ track: Track) {
-        currentQueue.removeAll { $0.id == track.id }
         wishlistQueue.removeAll { $0.id == track.id }
-
-        if currentIndex >= currentQueue.count {
-            currentIndex = max(0, currentQueue.count - 1)
-        }
     }
 
-    func moveToCurrentPosition(_ track: Track) {
-        // Убираем трек из всех очередей
-        currentQueue.removeAll { $0.id == track.id }
-        wishlistQueue.removeAll { $0.id == track.id }
-        
-        // Вставляем на текущую позицию
-        currentQueue.insert(track, at: currentIndex)
-    }
-        
-    func moveAfterCurrent(_ track: Track) {
-        currentQueue.removeAll { $0.id == track.id }
-        wishlistQueue.removeAll { $0.id == track.id }
-
-        let insertIndex = currentIndex + 1
-        if insertIndex <= currentQueue.count {
-            currentQueue.insert(track, at: insertIndex)
-        } else {
-            currentQueue.append(track)
-        }
-    }
-
-    func movePlayedToUpcoming(_ track: Track) {
-        currentQueue.removeAll { $0.id == track.id }
-        wishlistQueue.removeAll { $0.id == track.id }
-        
-        // Уменьшаем индекс если удалили трек перед текущим
-        if let removedIndex = currentQueue.firstIndex(where: { $0.id == track.id }),
-           removedIndex < currentIndex {
-            currentIndex -= 1
-        }
-
-        wishlistQueue.insert(track, at: 0)
-    }
-
-    func getAllQueueTracks() -> [Track] {
-        return currentQueue + wishlistQueue
-    }
-        
-    func getTrackState(_ track: Track) -> TrackState {
-        let isInCurrentQueue = currentQueue.contains(where: { $0.id == track.id })
-        let isInWishlist = wishlistQueue.contains(where: { $0.id == track.id })
-
-        guard isInCurrentQueue || isInWishlist else {
-            return .none
-        }
-        
-        guard let currentTrack = getCurrentTrack() else {
-            return .upcoming
-        }
-        
-        // КРИТИЧЕСКАЯ ДИАГНОСТИКА
-        print("=== TRACK STATE DEBUG ===")
-        print("Checking track: \(track.title)")
-        print("Current track: \(currentTrack.title)")
-        print("Track IDs: \(track.id) vs \(currentTrack.id)")
-        print("Match: \(track.id == currentTrack.id)")
-        print("Current index: \(currentIndex)")
-        print("Current queue: \(currentQueue.map { $0.title })")
-        print("=========================")
-        
-        if track.id == currentTrack.id {
-            print("🚨🚨🚨 MARKING AS CURRENT: \(track.title)")
-            return .current
-        }
-
-        if let trackIndex = currentQueue.firstIndex(where: { $0.id == track.id }),
-           trackIndex < currentIndex {
-            return .played
-        }
-        
-        return .upcoming
-    }
-        
-    // Этот метод больше не нужен, но оставляем для совместимости
-    func getTrack(byFileName fileName: String) -> Track? {
-        // Ищем по ID или другим полям, если нужно
-        return trackController.tracks.first { $0.id.uuidString == fileName }
-    }
-    
-    func getCurrentQueueCount() -> Int {
-        return currentQueue.count
-    }
-    
-    func getWishlistQueueCount() -> Int {
-        return wishlistQueue.count
-    }
-    
-    // Новый метод для поиска трека по ID
     func getTrack(byId trackId: UUID) -> Track? {
         return trackController.tracks.first { $0.id == trackId }
     }

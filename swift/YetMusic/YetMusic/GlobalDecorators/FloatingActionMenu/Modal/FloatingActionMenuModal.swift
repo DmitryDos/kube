@@ -3,6 +3,7 @@ import SwiftUI
 struct FloatingActionMenuModal: View {
     @ObservedObject private var themeObserver = ThemeObserver.shared
     let buttons: [ActionButton]
+    @Environment(\.isLandscape) private var isLandscape
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 12) {
@@ -27,7 +28,7 @@ struct FloatingActionMenuModal: View {
             .background(themeObserver.secondaryGlassColor)
             .cornerRadius(16)
         }
-        .padding(.top, 60)
+        .padding(.top, isLandscape ? 15 : 60)
         .padding(.trailing, 20)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
     }

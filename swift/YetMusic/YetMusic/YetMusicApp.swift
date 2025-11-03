@@ -48,8 +48,8 @@ struct MainContentView: View {
     private var pages: [AnyView] {
         [
             AnyView(FullPlayerView().statusBar(hidden: orientation.isLandscape)),
-            AnyView(QueueView().padding(.horizontal, orientation.isLandscape ? 92 : 16)),
-            AnyView(PlaylistsView().padding(.horizontal, orientation.isLandscape ? 92 : 8)),
+            AnyView(QueueView().padding(.horizontal, orientation.isLandscape ? 92 : 16).padding(.top, orientation.isLandscape ? 24 : 0)),
+            AnyView(PlaylistsView().padding(.horizontal, orientation.isLandscape ? 92 : 8).padding(.top, orientation.isLandscape ? 22 : 8)),
             AnyView(AuthView(authService: AuthService.shared).padding(.horizontal, orientation.isLandscape ? 92 : 0))
         ]
     }

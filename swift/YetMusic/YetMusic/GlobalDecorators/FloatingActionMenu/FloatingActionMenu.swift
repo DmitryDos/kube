@@ -89,11 +89,12 @@ struct FloatingActionMenu: View {
 struct WithFloatingMenuModifier: ViewModifier {
     let isLandscape: Bool
     @Environment(\.currentPage) private var currentPage
+    @ObservedObject private var ui = UIStateService.shared
     
     func body(content: Content) -> some View {
         content.overlay(
             Group {
-                if !(isLandscape && currentPage.wrappedValue == 0) {
+                if !ui.isFullPlayerVisible {
                     FloatingActionMenu()
                         .zIndex(9999)
                 }

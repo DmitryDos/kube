@@ -28,6 +28,7 @@ class PlaylistService: ObservableObject {
                 createSystemPlaylists()
             } else {
                 self.playlists = fetchedPlaylists
+                purgeInvalidTrackReferences()
                 print("✅ Loaded \(fetchedPlaylists.count) playlists from SwiftData")
             }
         } catch {
@@ -77,7 +78,9 @@ class PlaylistService: ObservableObject {
         if playlistID == PlaylistService.allMusicPlaylistID {
             return TrackController.shared.tracks
         } else {
-            return playlist.tracks
+            let live = TrackController.shared.tracks
+            let liveIds = Set(live.map { $0.id })
+            return playlist.tracks.filter { liveIds.contains($0.id) }
         }
     }
     
@@ -119,6 +122,28 @@ class PlaylistService: ObservableObject {
         guard let playlist = getPlaylist(by: playlistID) else { return }
         playlist.tracks.removeAll { $0.id == track.id }
         _ = saveContext()
+    }
+
+    // MARK: - Cleanup helpers
+    func removeTrackFromAllPlaylists(trackId: UUID) {
+        var changed = false
+        for i in playlists.indices {
+            let before = playlists[i].tracks.count
+            playlists[i].tracks.removeAll { $0.id == trackId }
+            if playlists[i].tracks.count != before { changed = true }
+        }
+        if changed { _ = saveContext() }
+    }
+
+    private func purgeInvalidTrackReferences() {
+        let liveIds = Set(TrackController.shared.tracks.map { $0.id })
+        var changed = false
+        for i in playlists.indices {
+            let before = playlists[i].tracks.count
+            playlists[i].tracks.removeAll { !liveIds.contains($0.id) }
+            if playlists[i].tracks.count != before { changed = true }
+        }
+        if changed { _ = saveContext() }
     }
     
     func toggleLike(track: Track) {

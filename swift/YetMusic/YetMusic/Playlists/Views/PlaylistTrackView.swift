@@ -14,8 +14,8 @@ struct PlaylistTrackView: View {
     @State private var isPressed = false
 
     private var isInQueue: Bool {
-        return queueService.currentQueue.contains(where: { $0.id == track.id }) ||
-               queueService.wishlistQueue.contains(where: { $0.id == track.id })
+        // Кнопка скрывается только если трек уже в очереди (upcoming)
+        return queueService.wishlistQueue.contains(where: { $0.id == track.id })
     }
     
     var body: some View {

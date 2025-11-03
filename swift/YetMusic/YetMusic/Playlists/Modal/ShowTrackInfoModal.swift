@@ -37,6 +37,7 @@ struct ShowTrackInfoModal: View {
             do {
                 try TrackController.shared.deleteTrack(track)
             } catch {}
+            ModalProvider.shared.dismiss()
         }
     }
     

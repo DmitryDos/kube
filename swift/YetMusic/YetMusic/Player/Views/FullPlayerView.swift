@@ -2,6 +2,7 @@ import SwiftUI
 
 struct FullPlayerView: View {
     @Environment(\.isLandscape) private var isLandscape
+    @ObservedObject private var ui = UIStateService.shared
 
     var body: some View {
         Group {
@@ -11,6 +12,8 @@ struct FullPlayerView: View {
                 VerticalPlayerView()
             }
         }
+        .onAppear { if isLandscape { ui.isFullPlayerVisible = true } }
+        .onDisappear { if isLandscape { ui.isFullPlayerVisible = false } }
     }
 }
 

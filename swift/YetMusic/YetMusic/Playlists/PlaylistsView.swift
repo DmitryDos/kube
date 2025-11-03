@@ -17,7 +17,16 @@ struct PlaylistsView: View {
         let allTracks = trackController.tracks
         return allTracks.filter { selectedTracks.contains($0.id) }
     }
-    
+
+    var body: some View {
+        ZStack {
+            VStack(spacing: 0) {
+                searchBar
+                scrollContent
+            }
+        }
+    }
+
     private var filteredPlaylists: [Playlist] {
         let allPlaylists = playlistService.getPlaylistOrder()
         
@@ -98,15 +107,6 @@ struct PlaylistsView: View {
         let searchLowercased = searchText.lowercased()
         return playlist.name.lowercased().contains(searchLowercased)
     }
-    
-    var body: some View {
-        ZStack {
-            VStack(spacing: 0) {
-                searchBar
-                scrollContent
-            }
-        }
-    }
 
     private var searchBar: some View {
         HStack {
@@ -124,8 +124,7 @@ struct PlaylistsView: View {
         }
         .padding(.horizontal, 8)
         .padding(.trailing, isLandscape ? 0 : 62)
-        .padding(.top, isLandscape ? 22 : 6)
-        .padding(.bottom, 8)
+        .padding(.bottom, 16)
     }
 
     private var scrollContent: some View {
@@ -140,7 +139,6 @@ struct PlaylistsView: View {
                 }
             }
             .padding(.horizontal, 8)
-            .padding(.vertical)
         }
     }
 
