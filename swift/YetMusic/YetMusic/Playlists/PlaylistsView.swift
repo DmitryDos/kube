@@ -28,17 +28,14 @@ struct PlaylistsView: View {
         let searchLowercased = searchText.lowercased()
         
         return allPlaylists.filter { playlist in
-            // Всегда показываем системные плейлисты
             if playlist.id == PlaylistService.likedPlaylistID || playlist.id == PlaylistService.allMusicPlaylistID {
                 return true
             }
-            
-            // Всегда показываем редактируемый плейлист
+
             if playlist.id == editingPlaylistID {
                 return true
             }
-            
-            // Показываем плейлист если название совпадает с поиском
+
             return playlist.name.lowercased().contains(searchLowercased)
         }
     }
@@ -58,7 +55,6 @@ struct PlaylistsView: View {
     }
     
     private func getTracksForPlaylist(_ playlist: Playlist) -> [Track] {
-        // Для редактируемого плейлиста показываем выбранные треки
         if playlist.id == editingPlaylistID {
             return editingPlaylistTracks
         }
@@ -66,10 +62,8 @@ struct PlaylistsView: View {
         let tracks: [Track]
         
         if playlist.id == PlaylistService.allMusicPlaylistID {
-            // Для "Вся музыка" фильтруем треки
             tracks = filteredTracksForAllMusic()
         } else if playlist.id == PlaylistService.likedPlaylistID {
-            // Для "Понравившееся" фильтруем треки
             tracks = playlistService.getTracksForPlaylist(playlist.id)
             if !searchText.isEmpty {
                 let searchLowercased = searchText.lowercased()
@@ -81,7 +75,6 @@ struct PlaylistsView: View {
                 return tracks
             }
         } else {
-            // Для кастомных плейлистов ВСЕГДА показываем все треки (без фильтрации)
             tracks = playlistService.getTracksForPlaylist(playlist.id)
         }
         
@@ -95,8 +88,7 @@ struct PlaylistsView: View {
            playlistMatchesSearch(playlist) {
             return true
         }
-        
-        // Для пустых кастомных плейлистов показываем только если нет поиска
+
         return searchText.isEmpty
     }
 
@@ -114,7 +106,6 @@ struct PlaylistsView: View {
                 scrollContent
             }
         }
-        .padding(.horizontal, isLandscape ? 42 : 0)
     }
 
     private var searchBar: some View {
@@ -131,8 +122,8 @@ struct PlaylistsView: View {
             .background(themeObserver.lightGlassColor)
             .cornerRadius(50)
         }
-        .padding(.leading, 16)
-        .padding(.trailing, isLandscape ? 30 : 78)
+        .padding(.horizontal, 8)
+        .padding(.trailing, isLandscape ? 0 : 62)
         .padding(.top, isLandscape ? 22 : 6)
         .padding(.bottom, 8)
     }
@@ -148,6 +139,7 @@ struct PlaylistsView: View {
                     playlistSection(for: playlist)
                 }
             }
+            .padding(.horizontal, 8)
             .padding(.vertical)
         }
     }
@@ -173,7 +165,6 @@ struct PlaylistsView: View {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(themeObserver.contrastColor)
             )
-            .padding(.horizontal, 16)
         }
         .buttonStyle(PressableButtonStyle())
         .contentShape(Rectangle())

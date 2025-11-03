@@ -13,6 +13,8 @@ struct QueueTrackView: View {
 
     let onDragChanged: ((DragGesture.Value) -> Void)?
     let onDragEnded: (() -> Void)?
+    
+    @State private var containerWidth: CGFloat = 0
 
     private var rowHeight: CGFloat {
         state == .current ? 90 : 70
@@ -20,6 +22,10 @@ struct QueueTrackView: View {
     
     private var imageSize: CGFloat {
         state == .current ? 70 : 60
+    }
+    
+    private var shouldShowImage: Bool {
+        containerWidth > 420
     }
     
     init(
@@ -44,28 +50,31 @@ struct QueueTrackView: View {
         HStack(spacing: 12) {
             if state == .upcoming || state == .played {
                 ZStack {
-                            Color.clear
-                            Image(systemName: "line.3.horizontal")
-                                .font(.system(size: 16, weight: .medium))
-                                .foregroundColor(themeObserver.accentColor)
-                        }
-                        .frame(width: 44)
-                        .frame(maxHeight: .infinity)
-                        .contentShape(Rectangle())
-                        .gesture(
-                            DragGesture(minimumDistance: 3)
-                                .onChanged { value in onDragChanged?(value) }
-                                .onEnded { _ in onDragEnded?() }
-                        )
+                    Color.clear
+                    Image(systemName: "line.3.horizontal")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundColor(themeObserver.accentColor)
+                }
+                .frame(width: 24)
+                .frame(maxHeight: .infinity)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 3)
+                        .onChanged { value in onDragChanged?(value) }
+                        .onEnded { _ in onDragEnded?() }
+                )
             } else {
                 Color.clear.frame(width: 20)
             }
 
-            AsyncTrackImage(
-                track: track,
-                cornerRadius: 0,
-                width: 120
-            )
+            // Показываем изображение только если ширина больше 420
+            if shouldShowImage {
+                AsyncTrackImage(
+                    track: track,
+                    cornerRadius: 0,
+                    width: 120
+                )
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(track.title)
@@ -85,7 +94,7 @@ struct QueueTrackView: View {
             HStack(spacing: 8) {
                 Text(formatDuration(track.duration))
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(themeObserver.secondaryColor)
+                    .foregroundColor(themeObserver.textColor)
                 
                 if state == .upcoming, let onDelete = onDelete {
                     IconButton(
@@ -98,6 +107,17 @@ struct QueueTrackView: View {
         }
         .padding(.horizontal, 12)
         .frame(height: rowHeight)
+        .background(
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear {
+                        containerWidth = geometry.size.width
+                    }
+                    .onChange(of: geometry.size.width) { newWidth in
+                        containerWidth = newWidth
+                    }
+            }
+        )
         .background(backgroundView)
         .overlay(
             RoundedRectangle(cornerRadius: 12)
@@ -122,9 +142,9 @@ struct QueueTrackView: View {
                     endPoint: .bottom
                 )
             case .played:
-                themeObserver.secondaryGlassColor
+                themeObserver.contrastColor
             case .upcoming:
-                themeObserver.secondaryGlassColor
+                themeObserver.contrastColor
             case .none:
                 Color.black.opacity(0)
             }

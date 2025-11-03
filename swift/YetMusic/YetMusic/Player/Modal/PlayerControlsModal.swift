@@ -1,36 +1,42 @@
 import SwiftUI
 
 struct PlayerControlsModal: View {
+    @ObservedObject private var queueService = QueueService.shared
     @ObservedObject private var audio = AudioPlayerService.shared
     @ObservedObject private var themeObserver = ThemeObserver.shared
     @State private var showingShareSheet = false
     @ObservedObject private var playlistService = PlaylistService.shared
-    
-    let queueService = QueueService.shared
 
     var body: some View {
+        let track = queueService.getCurrentTrack();
         ZStack {
             VStack {
                 VStack(spacing: 6) {
                     HStack(spacing: 6) {
                         GlassBlock {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(audio.trackInfo.track?.title ?? "No Track")
-                                    .font(.system(size: 14, weight: .semibold))
-                                    .foregroundColor(themeObserver.textColor)
-                                    .lineLimit(1)
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(audio.trackInfo.track?.title ?? "No Track")
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundColor(themeObserver.textColor)
+                                        .lineLimit(1)
+                                    
+                                    Text(audio.trackInfo.track?.artist ?? "Unknown Artist")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(themeObserver.textColor.opacity(0.8))
+                                        .lineLimit(1)
+                                }
                                 
-                                Text(audio.trackInfo.track?.artist ?? "Unknown Artist")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(themeObserver.textColor.opacity(0.8))
-                                    .lineLimit(1)
+                                Spacer()
                             }
-                            .frame(width: 160, height: 30)
+                            .frame(width: 260, height: 30)
                         }
                         
                         GlassBlock {
                             Button(action: {
-                                // TODO: Логика сохранения
+                                if let track = track {
+                                    PreloadService.shared.startPreloading(for: track)
+                                }
                             }) {
                                 Image(systemName: "plus")
                                     .font(.system(size: 18))
@@ -40,6 +46,8 @@ struct PlayerControlsModal: View {
                         }
                         
                         Spacer()
+
+                        FloatingActionMenu()
                     }
                     
                     HStack(spacing: 6) {
@@ -66,18 +74,7 @@ struct PlayerControlsModal: View {
                                     .frame(width: 30, height: 30)
                             }
                         }
-                        
-                        GlassBlock {
-                            Button(action: {
-                                ModalProvider.shared.show(SearchDockModal())
-                            }) {
-                                Image(systemName: "magnifyingglass")
-                                    .font(.system(size: 18))
-                                    .foregroundColor(themeObserver.textColor)
-                                    .frame(width: 30, height: 30)
-                            }
-                        }
-                        
+
                         Spacer()
                     }
                 }
@@ -87,14 +84,21 @@ struct PlayerControlsModal: View {
                 HStack(alignment: .bottom) {
                     GlassBlock {
                         Button(action: {
-                            // Зарезервировано под рекомендации
+                            ModalProvider.shared.replace(
+                                QueueSideModal(),
+                                onClose: {
+                                    ModalProvider.shared.replace(
+                                        PlayerControlsModal(),
+                                    )
+                                }
+                            )
                         }) {
                             VStack(spacing: 6) {
                                 Image(systemName: "eye")
                                     .font(.system(size: 18))
                                     .foregroundColor(themeObserver.textColor)
                                 
-                                Text("Смотрите также")
+                                Text("Очередь")
                                     .font(.system(size: 11))
                                     .foregroundColor(themeObserver.textColor)
                                     .multilineTextAlignment(.center)
@@ -196,14 +200,20 @@ struct PlayerControlsModal: View {
                     
                     GlassBlock {
                         Button(action: {
-                            ModalProvider.shared.show(QueueSideModal())
+                            ModalProvider.shared.replace(
+                                SearchDockModal(),
+                                    onClose: { ModalProvider.shared.replace(
+                                        PlayerControlsModal(),
+                                    )
+                                }
+                            )
                         }) {
                             VStack(spacing: 6) {
                                 Image(systemName: "list.bullet")
                                     .font(.system(size: 18))
                                     .foregroundColor(themeObserver.textColor)
                                 
-                                Text("В очереди")
+                                Text("Смотрите также")
                                     .font(.system(size: 11))
                                     .foregroundColor(themeObserver.textColor)
                                     .multilineTextAlignment(.center)

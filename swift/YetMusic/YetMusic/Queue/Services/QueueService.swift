@@ -183,11 +183,21 @@ class QueueService: ObservableObject {
             return .upcoming
         }
         
+        // КРИТИЧЕСКАЯ ДИАГНОСТИКА
+        print("=== TRACK STATE DEBUG ===")
+        print("Checking track: \(track.title)")
+        print("Current track: \(currentTrack.title)")
+        print("Track IDs: \(track.id) vs \(currentTrack.id)")
+        print("Match: \(track.id == currentTrack.id)")
+        print("Current index: \(currentIndex)")
+        print("Current queue: \(currentQueue.map { $0.title })")
+        print("=========================")
+        
         if track.id == currentTrack.id {
+            print("🚨🚨🚨 MARKING AS CURRENT: \(track.title)")
             return .current
         }
 
-        // Находим индекс трека в currentQueue
         if let trackIndex = currentQueue.firstIndex(where: { $0.id == track.id }),
            trackIndex < currentIndex {
             return .played

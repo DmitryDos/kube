@@ -28,7 +28,7 @@ final class PreloadService {
                 let streamURL = try await VideoService.shared.fetchStreamURL(videoID: videoId)
                 try await self.downloadAndStore(url: streamURL, for: track)
             } catch {
-                // Silent fail; no-op
+
             }
             self.inProgress.remove(track.id)
         }

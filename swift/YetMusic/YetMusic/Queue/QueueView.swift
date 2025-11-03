@@ -50,7 +50,6 @@ struct QueueView: View {
                             placeholder
                         }
                     }
-                    .padding(.horizontal, 8)
                     .animation(.easeInOut(duration: 0.15), value: hoverIndex)
                 }
             }
@@ -68,7 +67,6 @@ struct QueueView: View {
                     onDragEnded: nil
                 )
                 .frame(height: 70)
-                .padding(.horizontal, 12.5)
                 .offset(y: CGFloat(fromIndex + 1) * 76 + dragOffset)
                 .zIndex(1000)
                 .allowsHitTesting(false)
@@ -167,17 +165,14 @@ struct QueueView: View {
 
     private func updateOrder() {
         let upcomingTracks = tracks.filter { queueService.getTrackState($0) == .upcoming }
-        
-        // Создаем новые очереди на основе порядка треков
+
         var newCurrentQueue: [Track] = []
         var newWishlistQueue: [Track] = []
-        
-        // Текущий трек и сыгранные остаются в currentQueue
+
         if let currentTrack = queueService.getCurrentTrack() {
             newCurrentQueue.append(currentTrack)
         }
-        
-        // Добавляем upcoming треки в правильном порядке
+
         for track in upcomingTracks {
             if queueService.currentQueue.contains(where: { $0.id == track.id }) {
                 newCurrentQueue.append(track)
@@ -185,8 +180,7 @@ struct QueueView: View {
                 newWishlistQueue.append(track)
             }
         }
-        
-        // Обновляем очереди в сервисе
+
         queueService.currentQueue = newCurrentQueue
         queueService.wishlistQueue = newWishlistQueue
     }

@@ -17,6 +17,17 @@ class ModalProvider: ObservableObject {
         modals.append(item)
     }
 
+    func replace<Content: View>(_ modal: Content, onClose: (() -> Void)? = nil) {
+        guard let last = modals.popLast() else {
+            let item = ModalItem(view: AnyView(modal), onClose: onClose)
+            modals.append(item)
+            return
+        }
+        last.onClose?()
+        let item = ModalItem(view: AnyView(modal), onClose: onClose)
+        modals.append(item)
+    }
+
     func dismiss() {
         guard let last = modals.popLast() else { return }
         last.onClose?()

@@ -1,11 +1,49 @@
 import SwiftUI
 
 struct FloatingActionMenu: View {
+    @Environment(\.currentPage) private var currentPage
+    @State private var isExpanded = false
+
+    private var menuButtons: [ActionButton] {
+        [
+            ActionButton(
+                title: "Тема",
+                icon: themeObserver.isDarkTheme ? "sun.max.fill" : "moon.fill",
+                color: .orange
+            ) {
+                withAnimation {
+                    themeObserver.toggleTheme()
+                }
+            },
+
+            ActionButton(
+                title: "Профиль",
+                icon: "person.crop.circle",
+                color: .blue
+            ) {
+                currentPage.wrappedValue = 3
+            },
+            
+            ActionButton(
+                title: "Добавить треки",
+                icon: "arrow.down.circle.fill",
+                color: .yellow
+            ) {
+                ModalProvider.shared.show(AddTrackModal())
+            },
+            ActionButton(
+                title: "Загрузка",
+                icon: "tray.full",
+                color: .pink
+            ) {
+                ModalProvider.shared.show(VideoLoaderModal())
+            },
+        ]
+    }
+
     @ObservedObject private var themeObserver = ThemeObserver.shared
     @Environment(\.isLandscape) private var isLandscape
-    let buttons: [ActionButton]
 
-    @Binding var isExpanded: Bool
     @ObservedObject private var modalProvider = ModalProvider.shared
 
     var body: some View {
@@ -37,7 +75,7 @@ struct FloatingActionMenu: View {
 
     private func openMenu() {
         modalProvider.show(
-            FloatingActionMenuModal(buttons: buttons),
+            FloatingActionMenuModal(buttons: menuButtons),
             onClose: {
                 withAnimation {
                     isExpanded = false
@@ -49,24 +87,23 @@ struct FloatingActionMenu: View {
 
 
 struct WithFloatingMenuModifier: ViewModifier {
-    let buttons: [ActionButton]
     let isLandscape: Bool
-    let currentPage: Int
-    @Binding var isExpanded: Bool
+    @Environment(\.currentPage) private var currentPage
     
     func body(content: Content) -> some View {
         content.overlay(
             Group {
-                if !(isLandscape && currentPage == 0) {
-                    FloatingActionMenu(buttons: buttons, isExpanded: $isExpanded)
+                if !(isLandscape && currentPage.wrappedValue == 0) {
+                    FloatingActionMenu()
                         .zIndex(9999)
                 }
             }
         )
     }
 }
+
 extension View {
-    func withFloatingMenu(buttons: [ActionButton], isExpanded: Binding<Bool>, isLandscape: Bool, currentPage: Int) -> some View {
-        self.modifier(WithFloatingMenuModifier(buttons: buttons, isLandscape: isLandscape, currentPage: currentPage, isExpanded: isExpanded))
+    func withFloatingMenu(isLandscape: Bool) -> some View {
+        self.modifier(WithFloatingMenuModifier(isLandscape: isLandscape))
     }
 }

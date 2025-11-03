@@ -12,8 +12,15 @@
 
 import SwiftUI
 
-extension Notification.Name {
-    static let currentPageChanged = Notification.Name("currentPageChanged")
+struct CurrentPageKey: EnvironmentKey {
+    static let defaultValue: Binding<Int> = .constant(0)
+}
+
+extension EnvironmentValues {
+    var currentPage: Binding<Int> {
+        get { self[CurrentPageKey.self] }
+        set { self[CurrentPageKey.self] = newValue }
+    }
 }
 
 @main
@@ -23,69 +30,30 @@ struct MusicApp: App {
 
     var body: some Scene {
         WindowGroup {
-            MainContentView(current: $currentPage)
+            MainContentView()
                 .overlay(GlobalPlayerOverlay(currentPage: $currentPage))
-                .overlay(GlobalAuthOverlay())
                 .environmentObject(AuthService.shared)
                 .environmentObject(ThemeObserver.shared)
+                .environment(\.currentPage, $currentPage)
         }
     }
 }
 
 struct MainContentView: View {
-    @Binding var current: Int
-    
+    @Environment(\.currentPage) private var currentPage
     @StateObject private var orientation = OrientationObserver()
     @EnvironmentObject private var themeObserver: ThemeObserver
     @State private var scrollOffset: CGFloat = 0
-    @State private var isMenuExpanded = false
-    
+
     private var pages: [AnyView] {
         [
             AnyView(FullPlayerView().statusBar(hidden: orientation.isLandscape)),
-            AnyView(QueueView()),
-            AnyView(PlaylistsView()),
-            AnyView(AuthView(authService: AuthService.shared))
+            AnyView(QueueView().padding(.horizontal, orientation.isLandscape ? 92 : 16)),
+            AnyView(PlaylistsView().padding(.horizontal, orientation.isLandscape ? 92 : 8)),
+            AnyView(AuthView(authService: AuthService.shared).padding(.horizontal, orientation.isLandscape ? 92 : 0))
         ]
     }
-    
-    private var menuButtons: [ActionButton] {
-        [
-            ActionButton(
-                title: "Тема",
-                icon: themeObserver.isDarkTheme ? "sun.max.fill" : "moon.fill",
-                color: .orange
-            ) {
-                withAnimation {
-                    themeObserver.toggleTheme()
-                }
-            },
-            
-            ActionButton(
-                title: "Профиль",
-                icon: "person.crop.circle",
-                color: .blue
-            ) {
-                current = 3
-            },
-            
-            ActionButton(
-                title: "Добавить треки",
-                icon: "arrow.down.circle.fill",
-                color: .yellow
-            ) {
-                ModalProvider.shared.show(AddTrackModal())
-            },
-            ActionButton(
-                title: "Загрузка",
-                icon: "tray.full",
-                color: .pink
-            ) {
-                ModalProvider.shared.show(VideoLoaderModal())
-            },
-        ]
-    }
-    
+
     @State private var pageOffsets: [CGFloat] = Array(repeating: 0, count: 4)
     
     var body: some View {
@@ -94,7 +62,7 @@ struct MainContentView: View {
                 ParallaxBackground(scrollOffset: $scrollOffset, isLandscape: orientation.isLandscape)
                     .ignoresSafeArea()
                 
-                TabView(selection: $current) {
+                TabView(selection: currentPage) {
                     ForEach(0..<pages.count, id: \.self) { i in
                         pages[i]
                             .tag(i)
@@ -112,10 +80,8 @@ struct MainContentView: View {
             }
             .withModalProvider()
             .withFloatingMenu(
-                buttons: menuButtons,
-                isExpanded: $isMenuExpanded,
-                isLandscape: orientation.isLandscape,
-                currentPage: current)
+                isLandscape: orientation.isLandscape
+            )
         }
         .modifier(IgnoreSafeAreaWhenLandscape(isLandscape: orientation.isLandscape))
         .ignoresSafeArea(.all, edges: [.top, .bottom])

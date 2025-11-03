@@ -8,7 +8,7 @@ struct PlaylistSectionView: View {
     let isSystem: Bool
     var isEditingMode: Bool = false
     var showSelectionToggles: Bool = false
-    @Binding var selectedTracks: Set<UUID> // Меняем String на UUID
+    @Binding var selectedTracks: Set<UUID>
     @Binding var tempPlaylistName: String
     let onSavePlaylist: () -> Void
     let onDeletePlaylist: (() -> Void)?
@@ -18,11 +18,12 @@ struct PlaylistSectionView: View {
     @State private var isExpanded: Bool = false
     @State private var showDeleteAlert = false
 
+    @State private var currentWidth: CGFloat = 0
+    
     private var gridColumns: [GridItem] {
-        let screenWidth = UIScreen.main.bounds.width
-        if screenWidth > 600 {
+        if currentWidth > 600 {
             return [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())]
-        } else if screenWidth > 300 {
+        } else if currentWidth > 300 {
             return [GridItem(.flexible()), GridItem(.flexible())]
         } else {
             return [GridItem(.flexible())]
@@ -42,7 +43,7 @@ struct PlaylistSectionView: View {
         self.onTrackLongPress = onTrackLongPress
         self.onPlaylistLongPress = onPlaylistLongPress
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !isEditingMode {
@@ -68,27 +69,25 @@ struct PlaylistSectionView: View {
                 if tracks.isEmpty && !isEditingMode {
                     emptyStateView
                 } else {
-                    LazyVGrid(columns: gridColumns, spacing: 16) {
-                        ForEach(tracks) { track in
-                            PlaylistTrackView(
-                                track: track,
-                                isEditingMode: showSelectionToggles,
-                                isSelected: selectedTracks.contains(track.id), // Теперь используем UUID напрямую
-                                onToggle: {
-                                    toggleTrackSelection(track)
-                                },
-                                onLongPress: {
-                                    onTrackLongPress(track)
-                                }
-                            )
-                        }
-                    }
-                    .padding(.top, 12)
+                    // УБИРАЕМ GeometryReader и используем другой подход
+                    gridContent
+                        .padding(.top, 12)
                 }
             }
         }
-        .padding(.horizontal, 16)
         .padding(.top, 12)
+        .background(
+            // Добавляем GeometryReader здесь для отслеживания ширины
+            GeometryReader { geometry in
+                Color.clear
+                    .onAppear {
+                        currentWidth = geometry.size.width
+                    }
+                    .onChange(of: geometry.size.width) { newWidth in
+                        currentWidth = newWidth
+                    }
+            }
+        )
         .onAppear {
             if isEditingMode {
                 isExpanded = true
@@ -108,7 +107,7 @@ struct PlaylistSectionView: View {
             Text("Вы уверены, что хотите удалить \"\(title)\"?")
         }
     }
-    
+
     private var headerContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             if isEditingMode {
@@ -232,6 +231,24 @@ struct PlaylistSectionView: View {
             selectedTracks.remove(track.id)
         } else {
             selectedTracks.insert(track.id)
+        }
+    }
+
+    private var gridContent: some View {
+        LazyVGrid(columns: gridColumns, spacing: 16) {
+            ForEach(tracks) { track in
+                PlaylistTrackView(
+                    track: track,
+                    isEditingMode: showSelectionToggles,
+                    isSelected: selectedTracks.contains(track.id),
+                    onToggle: {
+                        toggleTrackSelection(track)
+                    },
+                    onLongPress: {
+                        onTrackLongPress(track)
+                    }
+                )
+            }
         }
     }
 }

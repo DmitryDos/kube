@@ -24,7 +24,7 @@ struct AppBackgroundModifier: ViewModifier {
             .cornerRadius(cornerRadius)
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius)
-                    .stroke(themeObserver.darkColor, lineWidth: 2)
+                    .stroke(themeObserver.contrastColor, lineWidth: 2)
             )
     }
 }
