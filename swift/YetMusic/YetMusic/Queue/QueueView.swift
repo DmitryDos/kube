@@ -114,6 +114,7 @@ struct QueueView: View {
                 }
             }
         }
+        .padding(.vertical, 6)
     }
 
     private func headerChip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {

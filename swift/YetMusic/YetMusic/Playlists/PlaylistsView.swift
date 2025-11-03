@@ -7,6 +7,7 @@ struct PlaylistsView: View {
     @ObservedObject private var themeObserver = ThemeObserver.shared
     @Environment(\.isLandscape) private var isLandscape
     @State private var searchText: String = ""
+    @State private var pendingSearch: DispatchWorkItem?
 
     @State private var editingPlaylistID: UUID? = nil
     @State private var selectedTracks: Set<UUID> = []
@@ -50,17 +51,7 @@ struct PlaylistsView: View {
     }
     
     private func filteredTracksForAllMusic() -> [Track] {
-        let allTracks = trackController.tracks
-        
-        if searchText.isEmpty {
-            return allTracks
-        }
-        
-        let searchLowercased = searchText.lowercased()
-        return allTracks.filter { track in
-            track.title.lowercased().contains(searchLowercased) ||
-            track.artist.lowercased().contains(searchLowercased)
-        }
+        return trackController.tracks
     }
     
     private func getTracksForPlaylist(_ playlist: Playlist) -> [Track] {
@@ -117,6 +108,7 @@ struct PlaylistsView: View {
                 TextField("Поиск треков и плейлистов", text: $searchText)
                     .textFieldStyle(PlainTextFieldStyle())
                     .foregroundColor(.black)
+                    .onChange(of: searchText) { _ in scheduleDebouncedServerSearch() }
             }
             .padding(10)
             .background(themeObserver.lightGlassColor)
@@ -125,6 +117,22 @@ struct PlaylistsView: View {
         .padding(.horizontal, 8)
         .padding(.trailing, isLandscape ? 0 : 62)
         .padding(.bottom, 16)
+    }
+
+    private func scheduleDebouncedServerSearch() {
+        pendingSearch?.cancel()
+        let work = DispatchWorkItem { triggerServerSearchNow() }
+        pendingSearch = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
+    }
+
+    private func triggerServerSearchNow() {
+        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if q.isEmpty {
+            trackController.loadFirstPage(query: nil)
+        } else {
+            trackController.loadFirstPage(query: q)
+        }
     }
 
     private var scrollContent: some View {

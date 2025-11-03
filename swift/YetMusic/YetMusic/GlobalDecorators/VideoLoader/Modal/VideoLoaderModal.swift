@@ -9,6 +9,8 @@ struct VideoLoaderModal: View {
 
     @ObservedObject private var themeObserver = ThemeObserver.shared
 
+    @Environment(\.isLandscape) private var isLandscape
+
     var body: some View {
         VStack(alignment: .trailing, spacing: 12) {
             Text("Загрузки")
@@ -23,13 +25,15 @@ struct VideoLoaderModal: View {
                     TransferRow(item: item)
                 }
             }
-            .frame(width: .infinity, height: 360)
+            .frame(maxWidth: .infinity, minHeight: 180, maxHeight: isLandscape ? 240 : 360, alignment: .top)
         }
         .overlay(ModalMarkerView().allowsHitTesting(false))
-        .padding(16)
+        .padding(.top, isLandscape ? 12 : 60)
         .background(themeObserver.darkColor)
-        .padding(.top, 60)
         .cornerRadius(16)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .frame(maxWidth: isLandscape ? 420 : .infinity,
+               maxHeight: isLandscape ? 260 : 440,
+               alignment: .top)
+        .ignoresSafeArea()
     }
 }

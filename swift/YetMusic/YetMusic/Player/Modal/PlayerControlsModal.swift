@@ -6,9 +6,38 @@ struct PlayerControlsModal: View {
     @ObservedObject private var themeObserver = ThemeObserver.shared
     @State private var showingShareSheet = false
     @ObservedObject private var playlistService = PlaylistService.shared
+    @Environment(\.currentPage) private var currentPage
+    @ObservedObject private var themeObs = ThemeObserver.shared
+    @Environment(\.isLandscape) private var isLandscape
+    @ObservedObject private var uiState = UIStateService.shared
+
+    private var menuButtons: [ActionButton] {
+        [
+            ActionButton(
+                title: "Тема",
+                icon: themeObs.isDarkTheme ? "sun.max.fill" : "moon.fill",
+                color: .orange
+            ) { withAnimation { themeObs.toggleTheme() } },
+            ActionButton(
+                title: "Профиль",
+                icon: "person.crop.circle",
+                color: .blue
+            ) { currentPage.wrappedValue = 3 },
+            ActionButton(
+                title: "Добавить треки",
+                icon: "arrow.down.circle.fill",
+                color: .yellow
+            ) { ModalProvider.shared.show(AddTrackModal()) },
+            ActionButton(
+                title: "Загрузка",
+                icon: "tray.full",
+                color: .pink
+            ) { ModalProvider.shared.show(VideoLoaderModal()) },
+        ]
+    }
 
     var body: some View {
-        let track = queueService.getCurrentTrack();
+        let track = audio.trackInfo.track
         ZStack {
             VStack {
                 VStack(spacing: 6) {
@@ -47,7 +76,26 @@ struct PlayerControlsModal: View {
                         
                         Spacer()
 
-                        FloatingActionMenu()
+                        if !uiState.isFloatingMenuOpen {
+                            GlassBlock {
+                                Button(action: {
+                                    UIStateService.shared.isFloatingMenuOpen = true
+                                    ModalProvider.shared.show(
+                                        FloatingActionMenuModal(buttons: menuButtons),
+                                        onClose: {
+                                            UIStateService.shared.isFloatingMenuOpen = false
+                                        }
+                                    )
+                                }) {
+                                    ZStack {
+                                        Image(systemName: "ellipsis")
+                                            .font(.system(size: 26))
+                                            .foregroundColor(themeObserver.textColor)
+                                    }
+                                }
+                                .frame(width: 24, height: 24)
+                            }
+                        }
                     }
                     
                     HStack(spacing: 6) {
@@ -114,41 +162,33 @@ struct PlayerControlsModal: View {
                         VStack(spacing: 0) {
                             VStack(spacing: 6) {
                                 GeometryReader { geo in
+                                    let horizontalPadding: CGFloat = 4
                                     ZStack(alignment: .leading) {
                                         Capsule()
                                             .fill(themeObserver.textColor.opacity(0.25))
                                             .frame(height: 4)
-                                        
-                                        let horizontalPadding: CGFloat = 12
-                                        let width = max(0, CGFloat(audio.trackInfo.bufferedProgress)) * max(0, geo.size.width - horizontalPadding * 2)
                                         Capsule()
                                             .fill(themeObserver.textColor.opacity(0.55))
-                                            .frame(width: width, height: 4)
+                                            .frame(width: max(0, CGFloat(audio.trackInfo.bufferedProgress)) * max(0, geo.size.width - horizontalPadding * 2), height: 4)
                                             .animation(.linear(duration: 0.1), value: audio.trackInfo.bufferedProgress)
-                                            .offset(x: horizontalPadding)
-                                        
-                                        Slider(
-                                            value: Binding(
-                                                get: { audio.trackInfo.progress },
-                                                set: {
-                                                    audio.seek(to: $0)
-                                                }
-                                            ),
-                                            in: 0...1,
-                                            onEditingChanged: { editing in
-                                                if editing {
-                                                    audio.startSeeking()
-                                                } else {
-                                                    audio.seek(to: audio.trackInfo.progress)
-                                                    audio.endSeeking()
-                                                }
-                                            }
-                                        )
-                                        .tint(themeObserver.textColor)
-                                        .padding(.horizontal, horizontalPadding)
                                     }
+                                    .padding(.horizontal, horizontalPadding)
+                                    .frame(height: 32)
+                                    
+                                    Slider(
+                                        value: Binding(
+                                            get: { max(0, min(1, audio.trackInfo.progress)) },
+                                            set: { audio.seek(to: max(0, min(1, $0))) }
+                                        ),
+                                        in: 0...1,
+                                        onEditingChanged: { editing in
+                                            if editing { audio.startSeeking() } else { audio.seek(to: audio.trackInfo.progress); audio.endSeeking() }
+                                        }
+                                    )
+                                    .tint(themeObserver.textColor)
+                                    .padding(.horizontal, horizontalPadding)
                                 }
-                                .frame(height: 14)
+                                .frame(height: 24)
                                 
                                 HStack {
                                     Text(format(audio.trackInfo.currentTime))
@@ -226,8 +266,7 @@ struct PlayerControlsModal: View {
                 .padding(.top, 12)
             }
         }
-        .padding(.vertical, 20)
-        .padding(.horizontal, 65)
+        .padding(16)
     }
 
     private func format(_ t: TimeInterval) -> String {

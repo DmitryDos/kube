@@ -2,7 +2,7 @@ import SwiftUI
 
 struct FloatingActionMenu: View {
     @Environment(\.currentPage) private var currentPage
-    @State private var isExpanded = false
+    @ObservedObject private var ui = UIStateService.shared
 
     private var menuButtons: [ActionButton] {
         [
@@ -48,11 +48,11 @@ struct FloatingActionMenu: View {
 
     var body: some View {
             VStack(alignment: .trailing, spacing: 12) {
-                if !isExpanded {
+                if !ui.isFloatingMenuOpen {
                     Button(action: {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                             openMenu()
-                            isExpanded = true
+                            ui.isFloatingMenuOpen = true
                         }
                     }) {
                         ZStack {
@@ -74,11 +74,12 @@ struct FloatingActionMenu: View {
     }
 
     private func openMenu() {
+        UIStateService.shared.isFloatingMenuOpen = true
         modalProvider.show(
             FloatingActionMenuModal(buttons: menuButtons),
             onClose: {
                 withAnimation {
-                    isExpanded = false
+                    UIStateService.shared.isFloatingMenuOpen = false
                 }
             }
         )
@@ -87,7 +88,6 @@ struct FloatingActionMenu: View {
 
 
 struct WithFloatingMenuModifier: ViewModifier {
-    let isLandscape: Bool
     @Environment(\.currentPage) private var currentPage
     @ObservedObject private var ui = UIStateService.shared
     
@@ -104,7 +104,7 @@ struct WithFloatingMenuModifier: ViewModifier {
 }
 
 extension View {
-    func withFloatingMenu(isLandscape: Bool) -> some View {
-        self.modifier(WithFloatingMenuModifier(isLandscape: isLandscape))
+    func withFloatingMenu() -> some View {
+        self.modifier(WithFloatingMenuModifier())
     }
 }

@@ -21,6 +21,7 @@ struct SearchDockModal: View {
                     .padding(.trailing, 45)
                     .frame(width: geo.size.width * 0.35, height: .infinity)
                 }
+                .padding(8)
             }
         }
     }

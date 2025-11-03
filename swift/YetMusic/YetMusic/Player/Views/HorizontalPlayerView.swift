@@ -5,6 +5,8 @@ struct HorizontalPlayerView: View {
     @ObservedObject private var audio = AudioPlayerService.shared
     @ObservedObject private var themeObserver = ThemeObserver.shared
     @State private var isModalOpen = false
+    @ObservedObject private var uiState = UIStateService.shared
+    @Environment(\.isLandscape) private var isLandscape
     
     var body: some View {
         ZStack {
@@ -28,6 +30,12 @@ struct HorizontalPlayerView: View {
             }
         }
         .statusBar(hidden: true)
+        .onAppear { uiState.isFullPlayerVisible = true }
+        .onDisappear {
+            uiState.isFullPlayerVisible = false
+            ModalProvider.shared.dismissAll()
+        }
+        .onChange(of: isLandscape) { _ in ModalProvider.shared.dismissAll() }
     }
 
     private var playerView: some View {

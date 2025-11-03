@@ -109,24 +109,23 @@ struct VerticalPlayerView: View {
             ZStack(alignment: .leading) {
                 GeometryReader { geo in
                     let horizontalPadding: CGFloat = 23
-                    Capsule()
-                        .fill(themeObserver.darkColor.opacity(0.25))
-                        .frame(height: 3)
-                    let width = max(0, CGFloat(audio.trackInfo.bufferedProgress)) * max(0, geo.size.width - horizontalPadding * 2)
-                    Capsule()
-                        .fill(themeObserver.darkColor.opacity(0.55))
-                        .frame(width: width, height: 3)
-                        .animation(.linear(duration: 0.1), value: audio.trackInfo.bufferedProgress)
-                        .offset(x: horizontalPadding)
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(themeObserver.darkColor.opacity(0.25))
+                            .frame(height: 3)
+                        Capsule()
+                            .fill(themeObserver.darkColor.opacity(0.55))
+                            .frame(width: max(0, CGFloat(audio.trackInfo.bufferedProgress)) * max(0, geo.size.width - horizontalPadding * 2), height: 3)
+                            .animation(.linear(duration: 0.1), value: audio.trackInfo.bufferedProgress)
+                    }
+                    .padding(.horizontal, horizontalPadding)
                 }
                 .frame(height: 3)
 
                 Slider(
                     value: Binding(
-                        get: { audio.trackInfo.progress },
-                        set: {
-                            audio.seek(to: $0)
-                        }
+                        get: { max(0, min(1, audio.trackInfo.progress)) },
+                        set: { audio.seek(to: max(0, min(1, $0))) }
                     ),
                     in: 0...1,
                     onEditingChanged: { editing in
