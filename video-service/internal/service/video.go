@@ -97,6 +97,38 @@ func (s *VideoService) GetUserVideosPaginated(userID, page, pageSize int) ([]mod
             ID:          video.ID,
             Title:       video.Title,
             Description: video.Description,
+            UserID:      video.UserID,
+            FileSize:    video.FileSize,
+            FileURL:     fileURL,
+            Status:      video.Status,
+            CreatedAt:   video.CreatedAt,
+        })
+    }
+
+    return response, nil
+}
+
+// GetAllVideosPaginated returns all videos (across users) with optional search query, optional user filter, and pagination
+func (s *VideoService) GetAllVideosPaginated(query string, userID *int, page, pageSize int) ([]model.VideoResponse, error) {
+    videos, err := s.repo.FindAllPaginatedWithSearch(query, userID, page, pageSize)
+    if err != nil {
+        return nil, err
+    }
+
+    var response []model.VideoResponse
+    ctx := context.Background()
+
+    for _, video := range videos {
+        fileURL, err := s.storage.GeneratePresignedURL(ctx, video.FilePath)
+        if err != nil {
+            fileURL = ""
+        }
+
+        response = append(response, model.VideoResponse{
+            ID:          video.ID,
+            Title:       video.Title,
+            Description: video.Description,
+            UserID:      video.UserID,
             FileSize:    video.FileSize,
             FileURL:     fileURL,
             Status:      video.Status,

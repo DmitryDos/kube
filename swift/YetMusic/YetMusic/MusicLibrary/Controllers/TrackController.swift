@@ -12,6 +12,7 @@ class TrackController: ObservableObject {
     private let videoService = VideoService.shared
     private var currentPage = 0
     private let pageSize = 20
+    private var currentQuery: String? = nil
     private var cancellables = Set<AnyCancellable>()
     
     private init() {
@@ -34,7 +35,9 @@ class TrackController: ObservableObject {
                         artist: remoteVideo.description,
                         duration: 0,
                         remoteVideoId: remoteVideo.id,
-                        videoURL: remoteVideo.fileURL
+                        videoURL: remoteVideo.fileURL,
+                        thumbnailURL: nil,
+                        ownerUserId: remoteVideo.userId
                     )
                 }
                 
@@ -78,10 +81,11 @@ class TrackController: ObservableObject {
     
     // MARK: - Pagination
     
-    func loadFirstPage() {
+    func loadFirstPage(query: String? = nil) {
         currentPage = 0
         tracks = []
         canLoadMore = true
+        currentQuery = query
         loadNextPage()
     }
     
@@ -90,16 +94,29 @@ class TrackController: ObservableObject {
         
         isLoading = true
         
-        // Загружаем локальные треки пагинированно
-        let localTracks = repository.getTracks(page: currentPage, pageSize: pageSize)
-        
-        // Загружаем удаленные видео
-        videoService.loadVideos(page: currentPage, pageSize: pageSize) { [weak self] remoteVideos in
+        // Загружаем удаленные видео (глобальные) с серверной пагинацией и фильтром
+        videoService.loadVideos(page: currentPage, pageSize: pageSize, query: currentQuery) { [weak self] remoteVideos in
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 
-                // Объединяем локальные и удаленные треки
-                let newTracks = self.mergeTracks(local: localTracks, remote: remoteVideos)
+                // Маппим видео в треки, подтягиваем локальные флаги при наличии
+                let newTracks: [Track] = remoteVideos.compactMap { remoteVideo in
+                    let existing = self.repository.findByRemoteVideoId(remoteVideo.id) ?? self.tracks.first(where: { $0.remoteVideoId == remoteVideo.id })
+                    let t = Track(
+                        title: remoteVideo.title,
+                        artist: remoteVideo.description,
+                        duration: 0,
+                        remoteVideoId: remoteVideo.id,
+                        videoURL: remoteVideo.fileURL,
+                        thumbnailURL: nil,
+                        ownerUserId: remoteVideo.userId
+                    )
+                    if let existing = existing {
+                        t.isSaved = existing.isSaved
+                        t.localFilePath = existing.localFilePath
+                    }
+                    return t
+                }
                 self.tracks.append(contentsOf: newTracks)
                 
                 self.canLoadMore = !newTracks.isEmpty
@@ -108,25 +125,10 @@ class TrackController: ObservableObject {
             }
         }
     }
-    
-    private func mergeTracks(local: [Track], remote: [Video]) -> [Track] {
-        var merged = local
-        
-        // Добавляем удаленные видео, которых нет в локальных
-        for remoteVideo in remote {
-            if !merged.contains(where: { $0.remoteVideoId == remoteVideo.id }) {
-                let track = Track(
-                    title: remoteVideo.title,
-                    artist: remoteVideo.description,
-                    duration: 0,
-                    remoteVideoId: remoteVideo.id,
-                    videoURL: remoteVideo.fileURL
-                )
-                merged.append(track)
-            }
-        }
-        
-        return merged
+
+    // Серверный поиск по "Вся музыка"
+    func searchAllMusic(query: String) {
+        loadFirstPage(query: query)
     }
     
     // Загрузка видео на сервер
@@ -142,7 +144,9 @@ class TrackController: ObservableObject {
             artist: artist,
             duration: 0, // TODO: получать длительность из метаданных
             remoteVideoId: video.id,
-            videoURL: video.fileURL
+            videoURL: video.fileURL,
+            thumbnailURL: nil,
+            ownerUserId: video.userId
         )
         
         await MainActor.run {
@@ -155,10 +159,14 @@ class TrackController: ObservableObject {
     }
     
     func deleteTrack(_ track: Track) throws {
-        if track.isRemoteVideo, let videoID = track.remoteVideoId {
+        // Только автор может удалять
+        if let ownerId = track.ownerUserId, let currentId = AuthService.shared.currentUser?.id, ownerId == currentId,
+           track.isRemoteVideo, let videoID = track.remoteVideoId {
             Task {
                 do { try await VideoService.shared.deleteVideo(videoID: videoID) } catch { print("Failed to delete remote video: \(error)") }
             }
+        } else {
+            // Нельзя удалять чужие треки с сервера
         }
 
         repository.deleteTrack(track)
@@ -178,6 +186,7 @@ class TrackController: ObservableObject {
         }
     }
     
+    // Локальный поиск оставим как быстрый фильтр по уже загруженным результатам
     func searchTracks(query: String) -> [Track] {
         guard !query.isEmpty else { return tracks }
         return tracks.filter {

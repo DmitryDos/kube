@@ -88,6 +88,7 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
             ID:          video.ID,
             Title:       video.Title,
             Description: video.Description,
+            UserID:      video.UserID,
             FileSize:    video.FileSize,
             FileURL:     presignedURL,
             Status:      video.Status,
@@ -151,6 +152,7 @@ func (h *VideoHandler) UploadVideoRaw(c *gin.Context) {
             ID:          video.ID,
             Title:       video.Title,
             Description: video.Description,
+            UserID:      video.UserID,
             FileSize:    video.FileSize,
             FileURL:     presignedURL,
             Status:      video.Status,
@@ -195,6 +197,41 @@ func (h *VideoHandler) GetVideos(c *gin.Context) {
     }
 
     // Debug header to quickly see counts
+    c.Writer.Header().Add("X-Videos-Count", strconv.Itoa(len(videos)))
+    c.JSON(http.StatusOK, gin.H{"videos": videos})
+}
+
+// SearchAllVideos returns all videos across users with optional server-side filtering and pagination
+func (h *VideoHandler) SearchAllVideos(c *gin.Context) {
+    // Require auth, but results are global
+    if _, exists := c.Get("userID"); !exists {
+        c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+        return
+    }
+
+    pageStr := c.DefaultQuery("page", "0")
+    limitStr := c.DefaultQuery("limit", "20")
+    q := c.DefaultQuery("q", "")
+    userIDStr := c.DefaultQuery("user_id", "")
+    mine := c.DefaultQuery("mine", "false")
+
+    page, _ := strconv.Atoi(pageStr)
+    limit, _ := strconv.Atoi(limitStr)
+    var filterUserID *int
+    if mine == "true" {
+        if uid, ok := c.Get("userID"); ok {
+            if v, ok2 := uid.(int); ok2 { filterUserID = &v }
+        }
+    } else if userIDStr != "" {
+        if v, err := strconv.Atoi(userIDStr); err == nil { filterUserID = &v }
+    }
+
+    videos, err := h.service.GetAllVideosPaginated(q, filterUserID, page, limit)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get videos"})
+        return
+    }
+
     c.Writer.Header().Add("X-Videos-Count", strconv.Itoa(len(videos)))
     c.JSON(http.StatusOK, gin.H{"videos": videos})
 }

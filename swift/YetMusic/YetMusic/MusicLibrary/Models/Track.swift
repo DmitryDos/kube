@@ -11,10 +11,11 @@ final class Track: Sendable {
     var remoteVideoId: Int?       // ID видео на сервере
     var videoURL: String?         // URL для стриминга с сервера
     var thumbnailURL: String?     // URL превью
+    var ownerUserId: Int?         // ID автора видео на сервере
     var isSaved: Bool             // Локально сохранено полностью
     var localFilePath: String?    // Путь к локальному файлу, если сохранен
     
-    init(title: String, artist: String, duration: TimeInterval, remoteVideoId: Int? = nil, videoURL: String? = nil, thumbnailURL: String? = nil) {
+    init(title: String, artist: String, duration: TimeInterval, remoteVideoId: Int? = nil, videoURL: String? = nil, thumbnailURL: String? = nil, ownerUserId: Int? = nil) {
         self.id = UUID()
         self.title = title
         self.artist = artist
@@ -23,6 +24,7 @@ final class Track: Sendable {
         self.remoteVideoId = remoteVideoId
         self.videoURL = videoURL
         self.thumbnailURL = thumbnailURL
+        self.ownerUserId = ownerUserId
         self.isSaved = false
         self.localFilePath = nil
     }

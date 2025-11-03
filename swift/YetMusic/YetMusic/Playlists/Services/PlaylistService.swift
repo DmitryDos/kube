@@ -6,6 +6,7 @@ class PlaylistService: ObservableObject {
     
     static let likedPlaylistID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     static let allMusicPlaylistID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    static let yourTracksPlaylistID = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
     
     @Published var playlists: [Playlist] = []
     private let modelContainer: ModelContainer
@@ -42,12 +43,14 @@ class PlaylistService: ObservableObject {
         
         let likedPlaylist = Playlist(id: PlaylistService.likedPlaylistID, name: "Понравившееся", isSystem: true)
         let allMusicPlaylist = Playlist(id: PlaylistService.allMusicPlaylistID, name: "Вся музыка", isSystem: true)
+        let yourTracks = Playlist(id: PlaylistService.yourTracksPlaylistID, name: "Ваши треки", isSystem: true)
         
         context.insert(likedPlaylist)
         context.insert(allMusicPlaylist)
+        context.insert(yourTracks)
         
         if saveContext() {
-            playlists = [likedPlaylist, allMusicPlaylist]
+            playlists = [likedPlaylist, allMusicPlaylist, yourTracks]
             print("✅ Created system playlists in SwiftData")
         } else {
             createSystemPlaylistsInMemory()
@@ -57,8 +60,9 @@ class PlaylistService: ObservableObject {
     private func createSystemPlaylistsInMemory() {
         let likedPlaylist = Playlist(id: PlaylistService.likedPlaylistID, name: "Понравившееся", isSystem: true)
         let allMusicPlaylist = Playlist(id: PlaylistService.allMusicPlaylistID, name: "Вся музыка", isSystem: true)
-        
-        playlists = [likedPlaylist, allMusicPlaylist]
+        let yourTracks = Playlist(id: PlaylistService.yourTracksPlaylistID, name: "Ваши треки", isSystem: true)
+
+        playlists = [likedPlaylist, allMusicPlaylist, yourTracks]
         print("✅ Created system playlists in memory")
     }
     
@@ -77,6 +81,9 @@ class PlaylistService: ObservableObject {
         
         if playlistID == PlaylistService.allMusicPlaylistID {
             return TrackController.shared.tracks
+        } else if playlistID == PlaylistService.yourTracksPlaylistID {
+            let currentUserId = AuthService.shared.currentUser?.id
+            return TrackController.shared.tracks.filter { $0.ownerUserId == currentUserId }
         } else {
             let live = TrackController.shared.tracks
             let liveIds = Set(live.map { $0.id })

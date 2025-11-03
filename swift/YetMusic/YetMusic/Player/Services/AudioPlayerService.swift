@@ -90,6 +90,11 @@ class AudioPlayerService: NSObject, ObservableObject {
             let item = AVPlayerItem(url: local)
             player.replaceCurrentItem(with: item)
             observeItem(item)
+        } else if let direct = track.videoURL, let directURL = URL(string: direct) {
+            // Используем пресайненный URL напрямую, если он есть
+            let item = AVPlayerItem(url: directURL)
+            player.replaceCurrentItem(with: item)
+            observeItem(item)
         } else if let videoID = track.remoteVideoId {
             // Стримим через API Gateway proxy с JWT заголовком
             let base = VideoService.shared.baseURL

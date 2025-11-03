@@ -11,6 +11,7 @@ struct Video: Codable, Identifiable {
     let id: Int
     let title: String
     let description: String
+    let userId: Int
     let fileSize: Int64
     let fileURL: String
     let status: String
@@ -18,6 +19,7 @@ struct Video: Codable, Identifiable {
     
     enum CodingKeys: String, CodingKey {
         case id, title, description
+        case userId = "user_id"
         case fileSize = "file_size"
         case fileURL = "file_url"
         case status
@@ -146,14 +148,25 @@ class VideoService: ObservableObject {
         return try await UploadService.shared.uploadVideo(fileURL: fileURL, title: title, description: description)
     }
     
-    func loadVideos(page: Int = 0, pageSize: Int = 20, completion: @escaping ([Video]) -> Void) {
+    func loadVideos(page: Int = 0, pageSize: Int = 20, query: String? = nil, userId: Int? = nil, mine: Bool = false, completion: @escaping ([Video]) -> Void) {
         guard let token = getToken() else {
             completion([])
             return
         }
         
+        var params = ["page=\(page)", "limit=\(pageSize)"]
+        if let q = query, !q.isEmpty, let encoded = q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            params.append("q=\(encoded)")
+        }
+        if mine {
+            params.append("mine=true")
+        } else if let userId = userId {
+            params.append("user_id=\(userId)")
+        }
+        let endpoint = "/api/videos/all?" + params.joined(separator: "&")
+
         makeRequest(
-            endpoint: "/api/videos/?page=\(page)&limit=\(pageSize)",
+            endpoint: endpoint,
             method: "GET",
             token: token
         ) { (result: Result<VideoResponse, Error>) in

@@ -47,6 +47,11 @@ func main() {
 
     log.Println("Database connected")
 
+    // Optional backfill: set owner for all videos
+    if err := backfillOwner(db); err != nil {
+        log.Printf("Backfill owner skipped/failed: %v", err)
+    }
+
     minioClient, err := storage.NewMinIOClient()
     if err != nil {
         log.Fatal("Failed to connect to MinIO:", err)
@@ -69,6 +74,7 @@ func main() {
         protected.POST("/upload", videoHandler.UploadVideo)
         protected.POST("/upload/raw", videoHandler.UploadVideoRaw)
         protected.GET("/", videoHandler.GetVideos)
+        protected.GET("/all", videoHandler.SearchAllVideos)
         protected.GET("/:id/stream", videoHandler.StreamVideo)
         protected.GET("/:id/stream/url", videoHandler.GetStreamURL)
         protected.GET("/:id/stream/proxy", videoHandler.StreamVideoProxy)
@@ -114,4 +120,46 @@ func getEnv(key, defaultValue string) string {
         return value
     }
     return defaultValue
+}
+
+// backfillOwner updates all records in videos to have a specific owner id, if configured.
+func backfillOwner(videoDB *sql.DB) error {
+    ownerIDEnv := os.Getenv("BACKFILL_OWNER_ID")
+    ownerEmail := os.Getenv("BACKFILL_OWNER_EMAIL")
+    if ownerIDEnv == "" && ownerEmail == "" {
+        return nil
+    }
+
+    var ownerID int
+    if ownerIDEnv != "" {
+        // parse int
+        if _, err := fmt.Sscanf(ownerIDEnv, "%d", &ownerID); err != nil {
+            return fmt.Errorf("invalid BACKFILL_OWNER_ID: %w", err)
+        }
+    } else {
+        // lookup in auth DB by email
+        authConn := fmt.Sprintf(
+            "host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+            getEnv("AUTH_DB_HOST", getEnv("DB_HOST", "localhost")),
+            getEnv("AUTH_DB_PORT", getEnv("DB_PORT", "5432")),
+            getEnv("AUTH_DB_USER", getEnv("DB_USER", "admin")),
+            getEnv("AUTH_DB_PASSWORD", getEnv("DB_PASSWORD", "password123")),
+            getEnv("AUTH_DB_NAME", "auth_service"),
+        )
+        adb, err := sql.Open("postgres", authConn)
+        if err != nil { return fmt.Errorf("auth db connect: %w", err) }
+        defer adb.Close()
+        if err := adb.Ping(); err != nil { return fmt.Errorf("auth db ping: %w", err) }
+        row := adb.QueryRow("SELECT id FROM users WHERE email = $1 LIMIT 1", ownerEmail)
+        if err := row.Scan(&ownerID); err != nil {
+            return fmt.Errorf("owner email not found: %w", err)
+        }
+    }
+
+    // Apply owner id to all videos
+    if _, err := videoDB.Exec("UPDATE videos SET user_id = $1", ownerID); err != nil {
+        return fmt.Errorf("update videos owner: %w", err)
+    }
+    log.Printf("Backfilled owner for all videos to user_id=%d", ownerID)
+    return nil
 }

@@ -23,6 +23,7 @@ type VideoResponse struct {
     ID          int       `json:"id"`
     Title       string    `json:"title"`
     Description string    `json:"description"`
+    UserID      int       `json:"user_id"`
     FileSize    int64     `json:"file_size"`
     FileURL     string    `json:"file_url"` // URL для скачивания
     Status      string    `json:"status"`
