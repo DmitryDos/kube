@@ -4,8 +4,8 @@ import Combine
 final class BackgroundUploadService: NSObject {
     static let shared = BackgroundUploadService()
 
-    private let baseURL = "https://conversational-zoila-flexuosely.ngrok-free.dev"
-    private let tokenKey = "authToken"
+    private let baseURL = AppConfig.apiBaseURL
+    private let tokenKey = AppConfig.authTokenKey
     private let sessionIdentifier = "com.yetmusic.upload.background"
 
     private lazy var session: URLSession = {

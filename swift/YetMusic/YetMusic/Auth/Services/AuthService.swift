@@ -9,8 +9,8 @@ class AuthService: ObservableObject {
     @Published var errorMessage: String?
     @Environment(\.isLandscape) private var isLandscape
     
-    private let baseURL = "https://conversational-zoila-flexuosely.ngrok-free.dev"
-    private let tokenKey = "authToken"
+    private let baseURL = AppConfig.apiBaseURL
+    private let tokenKey = AppConfig.authTokenKey
     private let userKey = "currentUser"
     
     private init() {

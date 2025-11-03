@@ -3,8 +3,8 @@ import Foundation
 final class UploadService {
     static let shared = UploadService()
 
-    private let baseURL = "https://conversational-zoila-flexuosely.ngrok-free.dev"
-    private let tokenKey = "authToken"
+    private let baseURL = AppConfig.apiBaseURL
+    private let tokenKey = AppConfig.authTokenKey
 
     private lazy var session: URLSession = {
         let config = URLSessionConfiguration.default
