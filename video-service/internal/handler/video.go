@@ -1,6 +1,7 @@
 package handler
 
 import (
+    "fmt"
     "io"
     "net/http"
     "regexp"
@@ -68,17 +69,23 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
         return
     }
 
+    var thumbnailURL string
+    if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
+        thumbnailURL = fmt.Sprintf("/api/videos/%d/thumbnail", video.ID)
+    }
+
     c.JSON(http.StatusCreated, gin.H{
         "message": "Video uploaded successfully",
         "video": model.VideoResponse{
-            ID:          video.ID,
-            Title:       video.Title,
-            Description: video.Description,
-            UserID:      video.UserID,
-            FileSize:    video.FileSize,
-            FileURL:     presignedURL,
-            Status:      video.Status,
-            CreatedAt:   video.CreatedAt,
+            ID:           video.ID,
+            Title:        video.Title,
+            Description:  video.Description,
+            UserID:       video.UserID,
+            FileSize:     video.FileSize,
+            FileURL:      presignedURL,
+            ThumbnailURL: thumbnailURL,
+            Status:       video.Status,
+            CreatedAt:    video.CreatedAt,
         },
     })
 }
@@ -116,17 +123,23 @@ func (h *VideoHandler) UploadVideoRaw(c *gin.Context) {
         return
     }
 
+    var thumbnailURL string
+    if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
+        thumbnailURL = fmt.Sprintf("/api/videos/%d/thumbnail", video.ID)
+    }
+
     c.JSON(http.StatusCreated, gin.H{
         "message": "Video uploaded successfully",
         "video": model.VideoResponse{
-            ID:          video.ID,
-            Title:       video.Title,
-            Description: video.Description,
-            UserID:      video.UserID,
-            FileSize:    video.FileSize,
-            FileURL:     presignedURL,
-            Status:      video.Status,
-            CreatedAt:   video.CreatedAt,
+            ID:           video.ID,
+            Title:        video.Title,
+            Description:  video.Description,
+            UserID:       video.UserID,
+            FileSize:     video.FileSize,
+            FileURL:      presignedURL,
+            ThumbnailURL: thumbnailURL,
+            Status:       video.Status,
+            CreatedAt:    video.CreatedAt,
         },
     })
 }

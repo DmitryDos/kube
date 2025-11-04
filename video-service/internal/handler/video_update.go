@@ -127,7 +127,7 @@ func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
     fileURL, _ := h.service.GetVideoStreamURL(ctx, video.FilePath)
     var thumbnailURL string
     if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
-        thumbnailURL, _ = h.service.GetVideoStreamURL(ctx, video.ThumbnailPath.String)
+        thumbnailURL = fmt.Sprintf("/api/videos/%d/thumbnail", videoID)
     }
 
     c.JSON(http.StatusOK, gin.H{
