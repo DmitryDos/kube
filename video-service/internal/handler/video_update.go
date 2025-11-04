@@ -56,7 +56,7 @@ func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
             }
 
             fileHeader := &model.FileHeader{
-                File:     thumbnailFile,
+                File:     thumbnailFile,  // thumbnailFile уже имеет тип multipart.File
                 Filename: thumbnailFileHeader.Filename,
                 Size:     thumbnailFileHeader.Size,
             }
@@ -90,4 +90,3 @@ func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
 
     c.JSON(http.StatusOK, gin.H{"message": "Video metadata updated successfully"})
 }
-
