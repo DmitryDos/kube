@@ -103,7 +103,27 @@ func (r *VideoRepository) FindByID(id uuid.UUID) (*model.Video, error) {
 		WHERE id = $1
 	`
 
-	log.Printf("[FindByID] Searching for video with UUID: %s", id.String())
+	log.Printf("[FindByID] Searching for video with UUID: %s (lowercase: %s)", id.String(), id.String())
+	
+	// Проверяем, есть ли видео с таким UUID (прямой запрос)
+	var testID uuid.UUID
+	testQuery := `SELECT id FROM videos WHERE id = $1 LIMIT 1`
+	testErr := r.db.QueryRow(testQuery, id).Scan(&testID)
+	if testErr == nil {
+		log.Printf("[FindByID] Direct test query found UUID: %s", testID.String())
+	} else {
+		log.Printf("[FindByID] Direct test query failed: %v", testErr)
+		
+		// Пробуем найти по строковому сравнению (на случай проблем с типами)
+		var foundIDStr string
+		testQuery2 := `SELECT id::text FROM videos WHERE id::text = LOWER($1) LIMIT 1`
+		if err := r.db.QueryRow(testQuery2, id.String()).Scan(&foundIDStr); err == nil {
+			log.Printf("[FindByID] Found by string comparison: %s", foundIDStr)
+		} else {
+			log.Printf("[FindByID] String comparison also failed: %v", err)
+		}
+	}
+	
 	var video model.Video
 	err := r.db.QueryRow(query, id).Scan(
 		&video.ID,
@@ -121,6 +141,23 @@ func (r *VideoRepository) FindByID(id uuid.UUID) (*model.Video, error) {
 
 	if err != nil {
 		log.Printf("[FindByID] Error scanning video: %v, UUID: %s", err, id.String())
+		if err == sql.ErrNoRows {
+			log.Printf("[FindByID] Video with UUID %s not found in database (sql.ErrNoRows)", id.String())
+			
+			// Показываем все доступные ID для отладки
+			var allIDs []string
+			allQuery := `SELECT id::text FROM videos ORDER BY created_at DESC LIMIT 10`
+			if rows, err := r.db.Query(allQuery); err == nil {
+				defer rows.Close()
+				for rows.Next() {
+					var idStr string
+					if err := rows.Scan(&idStr); err == nil {
+						allIDs = append(allIDs, idStr)
+					}
+				}
+				log.Printf("[FindByID] All available video IDs: %v", allIDs)
+			}
+		}
 		return nil, err
 	}
 
