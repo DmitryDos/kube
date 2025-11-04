@@ -3,27 +3,25 @@ package handler
 import (
     "fmt"
     "net/http"
-    "strconv"
     "video-service/internal/model"
 
     "github.com/gin-gonic/gin"
+    "github.com/google/uuid"
 )
 
-// UpdateVideoMetadata updates video metadata (title, description, thumbnail)
-// Supports both JSON (for title/description) and multipart/form-data (for thumbnail)
 func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
     userID, exists := c.Get("userID")
     if !exists {
         c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
         return
     }
-    userIDInt, ok := userID.(int)
+    userIDUUID, ok := userID.(uuid.UUID)
     if !ok {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID type"})
         return
     }
 
-    videoID, err := strconv.Atoi(c.Param("id"))
+    videoID, err := uuid.Parse(c.Param("id"))
     if err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
         return
@@ -57,26 +55,25 @@ func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
             }
 
             fileHeader := &model.FileHeader{
-                File:     thumbnailFile,  // thumbnailFile уже имеет тип multipart.File
+                File:     thumbnailFile,
                 Filename: thumbnailFileHeader.Filename,
                 Size:     thumbnailFileHeader.Size,
             }
 
-                if err := h.service.UpdateVideoThumbnail(userIDInt, videoID, fileHeader); err != nil {
-                    c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update thumbnail"})
-                    return
-                }
+            if err := h.service.UpdateVideoThumbnail(userIDUUID, videoID, fileHeader); err != nil {
+                c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update thumbnail"})
+                return
+            }
         }
 
         if req.Title != nil || req.Description != nil {
-            if err := h.service.UpdateVideoMetadata(userIDInt, videoID, &req); err != nil {
+            if err := h.service.UpdateVideoMetadata(userIDUUID, videoID, &req); err != nil {
                 c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update metadata"})
                 return
             }
         }
 
-        // Получаем обновленное видео для ответа
-        video, err := h.service.GetVideo(userIDInt, videoID)
+        video, err := h.service.GetVideo(userIDUUID, videoID)
         if err != nil {
             c.JSON(http.StatusOK, gin.H{"message": "Video metadata updated successfully"})
             return
@@ -86,7 +83,7 @@ func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
         fileURL, _ := h.service.GetVideoStreamURL(ctx, video.FilePath)
         var thumbnailURL string
         if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
-            thumbnailURL = fmt.Sprintf("/api/videos/%d/thumbnail", videoID)
+            thumbnailURL = fmt.Sprintf("/api/videos/%s/thumbnail", videoID.String())
         }
 
         c.JSON(http.StatusOK, gin.H{
@@ -100,6 +97,7 @@ func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
                 FileURL:      fileURL,
                 ThumbnailURL: thumbnailURL,
                 Status:       video.Status,
+                Duration:     video.Duration,
                 CreatedAt:    video.CreatedAt,
             },
         })
@@ -111,13 +109,12 @@ func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
         return
     }
 
-    if err := h.service.UpdateVideoMetadata(userIDInt, videoID, &req); err != nil {
+    if err := h.service.UpdateVideoMetadata(userIDUUID, videoID, &req); err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update metadata"})
         return
     }
 
-    // Получаем обновленное видео для ответа
-    video, err := h.service.GetVideo(userIDInt, videoID)
+    video, err := h.service.GetVideo(userIDUUID, videoID)
     if err != nil {
         c.JSON(http.StatusOK, gin.H{"message": "Video metadata updated successfully"})
         return
@@ -127,7 +124,7 @@ func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
     fileURL, _ := h.service.GetVideoStreamURL(ctx, video.FilePath)
     var thumbnailURL string
     if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
-        thumbnailURL = fmt.Sprintf("/api/videos/%d/thumbnail", videoID)
+        thumbnailURL = fmt.Sprintf("/api/videos/%s/thumbnail", videoID.String())
     }
 
     c.JSON(http.StatusOK, gin.H{
@@ -141,6 +138,7 @@ func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
             FileURL:      fileURL,
             ThumbnailURL: thumbnailURL,
             Status:       video.Status,
+            Duration:     video.Duration,
             CreatedAt:    video.CreatedAt,
         },
     })

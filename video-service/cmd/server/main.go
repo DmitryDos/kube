@@ -16,6 +16,7 @@ import (
 
     "github.com/gin-gonic/gin"
     _ "github.com/lib/pq"
+    "github.com/google/uuid"
 )
 
 func main() {
@@ -47,7 +48,6 @@ func main() {
 
     log.Println("Database connected")
 
-    // Optional backfill: set owner for all videos
     if err := backfillOwner(db); err != nil {
         log.Printf("Backfill owner skipped/failed: %v", err)
     }
@@ -133,7 +133,6 @@ func getEnv(key, defaultValue string) string {
     return defaultValue
 }
 
-// backfillOwner updates all records in videos to have a specific owner id, if configured.
 func backfillOwner(videoDB *sql.DB) error {
     ownerIDEnv := os.Getenv("BACKFILL_OWNER_ID")
     ownerEmail := os.Getenv("BACKFILL_OWNER_EMAIL")
@@ -141,14 +140,14 @@ func backfillOwner(videoDB *sql.DB) error {
         return nil
     }
 
-    var ownerID int
+    var ownerID uuid.UUID
     if ownerIDEnv != "" {
-        // parse int
-        if _, err := fmt.Sscanf(ownerIDEnv, "%d", &ownerID); err != nil {
+        var err error
+        ownerID, err = uuid.Parse(ownerIDEnv)
+        if err != nil {
             return fmt.Errorf("invalid BACKFILL_OWNER_ID: %w", err)
         }
     } else {
-        // lookup in auth DB by email
         authConn := fmt.Sprintf(
             "host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
             getEnv("AUTH_DB_HOST", getEnv("DB_HOST", "localhost")),
@@ -167,10 +166,9 @@ func backfillOwner(videoDB *sql.DB) error {
         }
     }
 
-    // Apply owner id to all videos
     if _, err := videoDB.Exec("UPDATE videos SET user_id = $1", ownerID); err != nil {
         return fmt.Errorf("update videos owner: %w", err)
     }
-    log.Printf("Backfilled owner for all videos to user_id=%d", ownerID)
+    log.Printf("Backfilled owner for all videos to user_id=%s", ownerID.String())
     return nil
 }

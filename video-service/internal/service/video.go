@@ -14,6 +14,8 @@ import (
     "video-service/internal/model"
     "video-service/internal/repository"
     "video-service/internal/storage"
+
+    "github.com/google/uuid"
 )
 
 type VideoService struct {
@@ -25,13 +27,13 @@ func NewVideoService(repo *repository.VideoRepository, storage *storage.MinIOCli
     return &VideoService{repo: repo, storage: storage}
 }
 
-func (s *VideoService) CreateVideoFile(userID int, fileHeader *model.FileHeader) (*model.Video, error) {
-    tempDir := filepath.Join("temp", fmt.Sprintf("%d", userID))
+func (s *VideoService) CreateVideoFile(userID uuid.UUID, fileHeader *model.FileHeader) (*model.Video, error) {
+    tempDir := filepath.Join("temp", userID.String())
     if err := os.MkdirAll(tempDir, 0755); err != nil {
         return nil, err
     }
 
-    hash := md5.Sum([]byte(fmt.Sprintf("%d_%s_%d", userID, fileHeader.Filename, time.Now().UnixNano())))
+    hash := md5.Sum([]byte(fmt.Sprintf("%s_%s_%d", userID.String(), fileHeader.Filename, time.Now().UnixNano())))
     fileName := hex.EncodeToString(hash[:]) + filepath.Ext(fileHeader.Filename)
     tempFilePath := filepath.Join(tempDir, fileName)
 
@@ -46,13 +48,14 @@ func (s *VideoService) CreateVideoFile(userID int, fileHeader *model.FileHeader)
     }
 
     ctx := context.Background()
-    objectName := fmt.Sprintf("user-%d/%s", userID, fileName)
+    objectName := fmt.Sprintf("user-%s/%s", userID.String(), fileName)
     if err := s.storage.UploadFile(ctx, objectName, tempFilePath, fileHeader.Size); err != nil {
         os.Remove(tempFilePath)
         return nil, err
     }
 
     video := &model.Video{
+        ID:           uuid.New(),
         Title:        "",
         Description:  "",
         FilePath:     objectName,
@@ -70,15 +73,10 @@ func (s *VideoService) CreateVideoFile(userID int, fileHeader *model.FileHeader)
     }
 
     os.Remove(tempFilePath)
-
     return video, nil
 }
 
-func (s *VideoService) GetUserVideos(userID int) ([]model.VideoResponse, error) {
-    return s.GetUserVideosPaginated(userID, 0, 0)
-}
-
-func (s *VideoService) GetUserVideosPaginated(userID, page, pageSize int) ([]model.VideoResponse, error) {
+func (s *VideoService) GetUserVideosPaginated(userID uuid.UUID, page, pageSize int) ([]model.VideoResponse, error) {
     videos, err := s.repo.FindByUserIDPaginated(userID, page, pageSize)
     if err != nil {
         return nil, err
@@ -95,7 +93,7 @@ func (s *VideoService) GetUserVideosPaginated(userID, page, pageSize int) ([]mod
 
         var thumbnailURL string
         if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
-            thumbnailURL = fmt.Sprintf("/api/videos/%d/thumbnail", video.ID)
+            thumbnailURL = fmt.Sprintf("/api/videos/%s/thumbnail", video.ID.String())
         }
 
         response = append(response, model.VideoResponse{
@@ -107,6 +105,7 @@ func (s *VideoService) GetUserVideosPaginated(userID, page, pageSize int) ([]mod
             FileURL:      fileURL,
             ThumbnailURL: thumbnailURL,
             Status:       video.Status,
+            Duration:     video.Duration,
             CreatedAt:    video.CreatedAt,
         })
     }
@@ -114,8 +113,7 @@ func (s *VideoService) GetUserVideosPaginated(userID, page, pageSize int) ([]mod
     return response, nil
 }
 
-// GetAllVideosPaginated returns all videos (across users) with optional search query, optional user filter, and pagination
-func (s *VideoService) GetAllVideosPaginated(query string, userID *int, page, pageSize int) ([]model.VideoResponse, error) {
+func (s *VideoService) GetAllVideosPaginated(query string, userID *uuid.UUID, page, pageSize int) ([]model.VideoResponse, error) {
     videos, err := s.repo.FindAllPaginatedWithSearch(query, userID, page, pageSize)
     if err != nil {
         return nil, err
@@ -132,7 +130,7 @@ func (s *VideoService) GetAllVideosPaginated(query string, userID *int, page, pa
 
         var thumbnailURL string
         if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
-            thumbnailURL = fmt.Sprintf("/api/videos/%d/thumbnail", video.ID)
+            thumbnailURL = fmt.Sprintf("/api/videos/%s/thumbnail", video.ID.String())
         }
 
         response = append(response, model.VideoResponse{
@@ -144,6 +142,7 @@ func (s *VideoService) GetAllVideosPaginated(query string, userID *int, page, pa
             FileURL:      fileURL,
             ThumbnailURL: thumbnailURL,
             Status:       video.Status,
+            Duration:     video.Duration,
             CreatedAt:    video.CreatedAt,
         })
     }
@@ -151,23 +150,22 @@ func (s *VideoService) GetAllVideosPaginated(query string, userID *int, page, pa
     return response, nil
 }
 
-func (s *VideoService) GetVideo(userID, videoID int) (*model.Video, error) {
+func (s *VideoService) GetVideo(userID, videoID uuid.UUID) (*model.Video, error) {
     video, err := s.repo.FindByID(videoID)
     if err != nil {
         return nil, err
     }
-
     if video.UserID != userID {
         return nil, errors.New("video not found")
     }
-
     return video, nil
 }
 
-// GetVideoPublic returns video by id without ownership check (for streaming)
-func (s *VideoService) GetVideoPublic(videoID int) (*model.Video, error) {
+func (s *VideoService) GetVideoPublic(videoID uuid.UUID) (*model.Video, error) {
     video, err := s.repo.FindByID(videoID)
-    if err != nil { return nil, err }
+    if err != nil {
+        return nil, err
+    }
     return video, nil
 }
 
@@ -175,7 +173,6 @@ func (s *VideoService) GetVideoStreamURL(ctx context.Context, objectName string)
     return s.storage.GeneratePresignedURL(ctx, objectName)
 }
 
-// Proxy helpers for streaming
 func (s *VideoService) StatObject(ctx context.Context, objectName string) (int64, string, error) {
     info, err := s.storage.Stat(ctx, objectName)
     if err != nil {
@@ -186,14 +183,20 @@ func (s *VideoService) StatObject(ctx context.Context, objectName string) (int64
 
 func (s *VideoService) GetObjectRange(ctx context.Context, objectName string, start, end int64) (io.ReadCloser, error) {
     obj, err := s.storage.GetObjectRange(ctx, objectName, start, end)
-    if err != nil { return nil, err }
+    if err != nil {
+        return nil, err
+    }
     return obj, nil
 }
 
-func (s *VideoService) DeleteVideo(userID, videoID int) error {
+func (s *VideoService) DeleteVideo(userID, videoID uuid.UUID) error {
     video, err := s.repo.FindByID(videoID)
-    if err != nil { return err }
-    if video.UserID != userID { return errors.New("video not found") }
+    if err != nil {
+        return err
+    }
+    if video.UserID != userID {
+        return errors.New("video not found")
+    }
     ctx := context.Background()
     _ = s.storage.DeleteFile(ctx, video.FilePath)
     if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
@@ -202,9 +205,7 @@ func (s *VideoService) DeleteVideo(userID, videoID int) error {
     return s.repo.DeleteByID(videoID)
 }
 
-// CreateVideoStream uploads the provided reader directly to storage and creates a DB record.
-// If size is unknown, pass size = -1 and a suitable contentType (e.g., "video/mp4").
-func (s *VideoService) CreateVideoStream(userID int, reader io.Reader, filename string, size int64, contentType string) (*model.Video, error) {
+func (s *VideoService) CreateVideoStream(userID uuid.UUID, reader io.Reader, filename string, size int64, contentType string) (*model.Video, error) {
     ext := filepath.Ext(filename)
     if ext == "" {
         if contentType == "video/mp4" {
@@ -214,11 +215,11 @@ func (s *VideoService) CreateVideoStream(userID int, reader io.Reader, filename 
         }
     }
 
-    hash := md5.Sum([]byte(fmt.Sprintf("%d_%s_%d", userID, filename, time.Now().UnixNano())))
+    hash := md5.Sum([]byte(fmt.Sprintf("%s_%s_%d", userID.String(), filename, time.Now().UnixNano())))
     fileName := hex.EncodeToString(hash[:]) + ext
 
     ctx := context.Background()
-    objectName := fmt.Sprintf("user-%d/%s", userID, fileName)
+    objectName := fmt.Sprintf("user-%s/%s", userID.String(), fileName)
 
     uploadedSize, err := s.storage.UploadReader(ctx, objectName, reader, size, contentType)
     if err != nil {
@@ -231,6 +232,7 @@ func (s *VideoService) CreateVideoStream(userID int, reader io.Reader, filename 
     }
 
     video := &model.Video{
+        ID:           uuid.New(),
         Title:        "",
         Description:  "",
         FilePath:     objectName,
@@ -248,41 +250,33 @@ func (s *VideoService) CreateVideoStream(userID int, reader io.Reader, filename 
 
     return video, nil
 }
-// UpdateVideoMetadata updates video title and description
-func (s *VideoService) UpdateVideoMetadata(userID, videoID int, req *model.UpdateVideoMetadataRequest) error {
-    // Проверяем ownership
+
+func (s *VideoService) UpdateVideoMetadata(userID, videoID uuid.UUID, req *model.UpdateVideoMetadataRequest) error {
     video, err := s.repo.FindByID(videoID)
     if err != nil {
         return err
     }
-    
     if video.UserID != userID {
         return errors.New("video not found or access denied")
     }
-
-    // Обновляем метаданные
     return s.repo.UpdateMetadata(videoID, req.Title, req.Description)
 }
 
-// UpdateVideoThumbnail updates video thumbnail
-func (s *VideoService) UpdateVideoThumbnail(userID, videoID int, fileHeader *model.FileHeader) error {
-    // Проверяем ownership
+func (s *VideoService) UpdateVideoThumbnail(userID, videoID uuid.UUID, fileHeader *model.FileHeader) error {
     video, err := s.repo.FindByID(videoID)
     if err != nil {
         return err
     }
-    
     if video.UserID != userID {
         return errors.New("video not found or access denied")
     }
 
-    // Создаем временный файл для thumbnail
-    tempDir := filepath.Join("temp", fmt.Sprintf("%d", userID))
+    tempDir := filepath.Join("temp", userID.String())
     if err := os.MkdirAll(tempDir, 0755); err != nil {
         return err
     }
 
-    hash := md5.Sum([]byte(fmt.Sprintf("thumb_%d_%s_%d", userID, fileHeader.Filename, time.Now().UnixNano())))
+    hash := md5.Sum([]byte(fmt.Sprintf("thumb_%s_%s_%d", userID.String(), fileHeader.Filename, time.Now().UnixNano())))
     fileName := hex.EncodeToString(hash[:]) + filepath.Ext(fileHeader.Filename)
     tempFilePath := filepath.Join(tempDir, fileName)
 
@@ -296,23 +290,19 @@ func (s *VideoService) UpdateVideoThumbnail(userID, videoID int, fileHeader *mod
         return err
     }
 
-    // Загружаем в MinIO
     ctx := context.Background()
-    objectName := fmt.Sprintf("user-%d/thumbnails/%s", userID, fileName)
-    
+    objectName := fmt.Sprintf("user-%s/thumbnails/%s", userID.String(), fileName)
+
     if err := s.storage.UploadFile(ctx, objectName, tempFilePath, fileHeader.Size); err != nil {
         os.Remove(tempFilePath)
         return err
     }
 
-    // Удаляем старый thumbnail если есть
     if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
         s.storage.DeleteFile(ctx, video.ThumbnailPath.String)
     }
 
-    // Обновляем путь в БД
     if err := s.repo.UpdateThumbnail(videoID, objectName); err != nil {
-        // Откатываем загрузку если обновление БД не удалось
         s.storage.DeleteFile(ctx, objectName)
         return err
     }
