@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"database/sql"
+	"time"
+)
 
 type Video struct {
     ID           int       `json:"id" db:"id"`
@@ -8,7 +11,7 @@ type Video struct {
     Description  string    `json:"description" db:"description"`
     FilePath     string    `json:"file_path" db:"file_path"`
     FileSize     int64     `json:"file_size" db:"file_size"`
-    ThumbnailPath string   `json:"thumbnail_path" db:"thumbnail_path"`
+    ThumbnailPath sql.NullString `json:"thumbnail_path" db:"thumbnail_path"`
     UserID       int       `json:"user_id" db:"user_id"`
     Status       string    `json:"status" db:"status"`
     CreatedAt    time.Time `json:"created_at" db:"created_at"`

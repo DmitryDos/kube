@@ -3,6 +3,7 @@ package service
 import (
     "context"
     "crypto/md5"
+    "database/sql"
     "encoding/hex"
     "errors"
     "fmt"
@@ -56,7 +57,7 @@ func (s *VideoService) CreateVideoFile(userID int, fileHeader *model.FileHeader)
         Description:  "",
         FilePath:     objectName,
         FileSize:     fileHeader.Size,
-        ThumbnailPath: "",
+        ThumbnailPath: sql.NullString{},
         UserID:       userID,
         Status:       "ready",
     }
@@ -93,8 +94,8 @@ func (s *VideoService) GetUserVideosPaginated(userID, page, pageSize int) ([]mod
         }
 
         var thumbnailURL string
-        if video.ThumbnailPath != "" {
-            thumbnailURL, _ = s.storage.GeneratePresignedURL(ctx, video.ThumbnailPath)
+        if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
+            thumbnailURL, _ = s.storage.GeneratePresignedURL(ctx, video.ThumbnailPath.String)
         }
 
         response = append(response, model.VideoResponse{
@@ -130,8 +131,8 @@ func (s *VideoService) GetAllVideosPaginated(query string, userID *int, page, pa
         }
 
         var thumbnailURL string
-        if video.ThumbnailPath != "" {
-            thumbnailURL, _ = s.storage.GeneratePresignedURL(ctx, video.ThumbnailPath)
+        if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
+            thumbnailURL, _ = s.storage.GeneratePresignedURL(ctx, video.ThumbnailPath.String)
         }
 
         response = append(response, model.VideoResponse{
@@ -195,8 +196,8 @@ func (s *VideoService) DeleteVideo(userID, videoID int) error {
     if video.UserID != userID { return errors.New("video not found") }
     ctx := context.Background()
     _ = s.storage.DeleteFile(ctx, video.FilePath)
-    if video.ThumbnailPath != "" {
-        _ = s.storage.DeleteFile(ctx, video.ThumbnailPath)
+    if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
+        _ = s.storage.DeleteFile(ctx, video.ThumbnailPath.String)
     }
     return s.repo.DeleteByID(videoID)
 }
@@ -234,7 +235,7 @@ func (s *VideoService) CreateVideoStream(userID int, reader io.Reader, filename 
         Description:  "",
         FilePath:     objectName,
         FileSize:     finalSize,
-        ThumbnailPath: "",
+        ThumbnailPath: sql.NullString{},
         UserID:       userID,
         Status:       "ready",
     }
@@ -305,8 +306,8 @@ func (s *VideoService) UpdateVideoThumbnail(userID, videoID int, fileHeader *mod
     }
 
     // Удаляем старый thumbnail если есть
-    if video.ThumbnailPath != "" {
-        s.storage.DeleteFile(ctx, video.ThumbnailPath)
+    if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
+        s.storage.DeleteFile(ctx, video.ThumbnailPath.String)
     }
 
     // Обновляем путь в БД

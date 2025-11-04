@@ -22,13 +22,20 @@ func (r *VideoRepository) Create(video *model.Video) error {
         RETURNING id, created_at, updated_at
     `
 
+    var thumbnailPath interface{}
+    if video.ThumbnailPath.Valid {
+        thumbnailPath = video.ThumbnailPath.String
+    } else {
+        thumbnailPath = nil
+    }
+
     return r.db.QueryRow(
         query,
         video.Title,
         video.Description,
         video.FilePath,
         video.FileSize,
-        video.ThumbnailPath,
+        thumbnailPath,
         video.UserID,
         video.Status,
     ).Scan(&video.ID, &video.CreatedAt, &video.UpdatedAt)
