@@ -9,7 +9,7 @@ import SwiftUI
 
 struct VideoInfoModal: View {
     @ObservedObject private var themeObserver = ThemeObserver.shared
-    let video: VideoResult
+    let video: Track
     
     var body: some View {
         ModalContainer(
@@ -18,35 +18,26 @@ struct VideoInfoModal: View {
             bottomButton: nil
         ) {
             VStack(spacing: 20) {
-                AsyncImage(url: URL(string: video.imageURL ?? "")) { phase in
-                    if case .success(let image) = phase {
-                        image
-                            .resizable()
-                            .scaledToFit()
-                            .cornerRadius(12)
-                    }
-                }
-                .frame(height: 200)
+                AsyncTrackImage(track: video, width: .infinity)
 
                 VStack(alignment: .leading, spacing: 16) {
                     Text(video.title)
                         .font(.title3.weight(.bold))
                         .foregroundColor(themeObserver.themedPrimaryColor)
                     
-                    Text("Автор: \(video.subtitle)")
+                    Text("Автор: \(video.ownerUserId)")
                         .font(.body)
                         .foregroundColor(themeObserver.themedPrimaryColor.opacity(0.8))
                     
-                    if !video.description.isEmpty {
-                        Text(video.description)
+                    if !video.desc.isEmpty {
+                        Text(video.desc)
                             .font(.body)
                             .foregroundColor(themeObserver.themedPrimaryColor.opacity(0.7))
                     }
                     
                     VStack(spacing: 8) {
                         DetailRow(title: "Длительность", value: formatDuration(video.duration))
-                        DetailRow(title: "Просмотры", value: "\(video.viewCount)")
-                        DetailRow(title: "Добавлено", value: formatDate(video.createdAt))
+                        DetailRow(title: "Добавлено", value: formatDate(video.dateAdded))
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)

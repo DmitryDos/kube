@@ -50,7 +50,7 @@ struct PlayerControlsModal: View {
                                         .foregroundColor(themeObserver.textColor)
                                         .lineLimit(1)
                                     
-                                    Text(audio.trackInfo.track?.artist ?? "Unknown Artist")
+                                    Text(audio.trackInfo.track?.desc ?? "Empty Description")
                                         .font(.system(size: 12))
                                         .foregroundColor(themeObserver.textColor.opacity(0.8))
                                         .lineLimit(1)

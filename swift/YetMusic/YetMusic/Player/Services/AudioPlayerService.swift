@@ -86,17 +86,14 @@ class AudioPlayerService: NSObject, ObservableObject {
     }
     
     func load(track: Track) {
-        // Локальный приоритет
         if track.isSaved, let local = track.playableURL {
             let item = AVPlayerItem(url: local)
             player.replaceCurrentItem(with: item)
             observeItem(item)
-        } else if let videoID = track.remoteVideoId {
-            // Стримим через API Gateway proxy
+        } else if let videoID = track.videoURL {
             let base = VideoService.shared.baseURL
             guard let url = URL(string: base + "/api/videos/\(videoID)/stream/proxy") else { return }
-            
-            // Proxy endpoint публичный, но если есть токен - добавляем его
+
             var headers: [String: String] = [:]
             if let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) {
                 headers["Authorization"] = "Bearer \(token)"
@@ -106,10 +103,9 @@ class AudioPlayerService: NSObject, ObservableObject {
             let item = AVPlayerItem(asset: asset)
             player.replaceCurrentItem(with: item)
             observeItem(item)
-            // Запускаем предзагрузку в фоне
+
             PreloadService.shared.startPreloading(for: track)
         } else if let direct = track.videoURL, let directURL = URL(string: direct) {
-            // Фоллбэк: если proxy недоступен, пробуем presigned URL
             let item = AVPlayerItem(url: directURL)
             player.replaceCurrentItem(with: item)
             observeItem(item)

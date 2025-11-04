@@ -73,11 +73,11 @@ struct SearchView: View {
     private var resultsView: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
-                ForEach(filteredResults) { item in
+                ForEach(filteredResults, id: \.id) { item in
                     switch item {
-                    case .video(let video):
-                        SearchVideoView(video: video) {
-                            showVideoInfo(video)
+                    case .video(let track):
+                        SearchVideoView(track: track) {
+                            showVideoInfo(track)
                         }
                         .onAppear {
                             if isLastItem(item, in: filteredResults) {
@@ -185,21 +185,11 @@ struct SearchView: View {
         searchService.search(query: query, filter: selectedFilter)
     }
     
-    private func showVideoInfo(_ video: VideoResult) {
-        // Создаем временный Track для показа в модалке
-        let baseURL = AppConfig.apiBaseURL
-        let proxyURL = "\(baseURL)/api/videos/\(video.id)/stream/proxy"
-        
-        let track = Track(
-            title: video.title,
-            artist: video.subtitle,
-            duration: video.duration,
-            remoteVideoId: video.id,
-            videoURL: proxyURL,
-            thumbnailURL: video.imageURL,
-            ownerUserId: video.userId
-        )
-        
+    private func showVideoInfo(_ track: Track) {
+        // Создаем копию трека с обновленным URL для модалки
+//        let baseURL = AppConfig.apiBaseURL
+//        let proxyURL = "\(baseURL)/api/videos/\(track.id)/stream/proxy"
+
         ModalProvider.shared.show(ShowTrackInfoModal(track: track, isReadOnly: true))
     }
     

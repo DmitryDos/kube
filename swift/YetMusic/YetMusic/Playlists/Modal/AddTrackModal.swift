@@ -34,7 +34,7 @@ struct AddTrackModal: View {
             return AnyView(
                 WideButton(
                     title: "Загрузить",
-                    action: downloadFromURL,
+                    action: {},
                     isEnabled: !isLoading
                 )
                 .padding(.horizontal)
@@ -176,39 +176,7 @@ struct AddTrackModal: View {
         }
     }
 
-    private func downloadFromURL() {
-        guard let url = URL(string: urlString) else {
-            errorMessage = "Неверный URL"
-            return
-        }
-        
-        isLoading = true
-        errorMessage = nil
-        
-        Task {
-            do {
-                let parser = MediaURLParser.shared
-                let (downloadURL, parsedTitle, parsedArtist) = try await parser.parseMediaURL(url)
-                
-                await MainActor.run {
-                    self.downloadedURL = downloadURL
-                    self.trackTitle = parsedTitle ?? extractTitleFromURL(url)
-                    self.trackArtist = parsedArtist ?? "Unknown Artist"
-                    self.showMetadataFields = true
-                    self.isLoading = false
-                }
-                
-            } catch {
-                await MainActor.run {
-                    errorMessage = "Ошибка загрузки: \(error.localizedDescription)"
-                    isLoading = false
-                }
-            }
-        }
-    }
-
     private func saveTrack() {
-        // Приоритет: локальный файл -> фоновая загрузка
         if let fileURL = selectedFileURL {
             BackgroundUploadService.shared.enqueueUpload(fileURL: fileURL)
             ModalProvider.shared.dismiss()

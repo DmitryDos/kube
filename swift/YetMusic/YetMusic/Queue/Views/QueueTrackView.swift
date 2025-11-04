@@ -69,7 +69,7 @@ struct QueueTrackView: View {
                     .foregroundColor(themeObserver.textColor)
                     .lineLimit(1)
                 
-                Text(track.artist)
+                Text(track.desc)
                     .font(.system(size: 11))
                     .foregroundColor(themeObserver.primaryGlassColor)
                     .lineLimit(1)

@@ -8,9 +8,9 @@ final class HistoryEntry {
     var createdAt: Date
     var track: Track?
     var trackId: UUID?
-    // Snapshot metadata to keep history stable even if Track is deleted
+    var ownerId: UUID?
     var savedTitle: String
-    var savedArtist: String
+    var savedDesc: String
     var savedDuration: Double
     var savedThumbnailURL: String?
 
@@ -20,8 +20,9 @@ final class HistoryEntry {
         self.createdAt = Date()
         self.track = track
         self.trackId = track.id
+        self.ownerId = track.ownerUserId
         self.savedTitle = track.title
-        self.savedArtist = track.artist
+        self.savedDesc = track.desc
         self.savedDuration = track.duration
         self.savedThumbnailURL = track.thumbnailURL
     }

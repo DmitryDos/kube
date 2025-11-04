@@ -16,7 +16,7 @@ final class HistoryService: ObservableObject {
         let dayStart: Date
         let createdAt: Date
         let title: String
-        let artist: String
+        let desc: String
         let duration: Double
         let thumbnailURL: String?
         let track: Track? // resolved if exists
@@ -75,7 +75,7 @@ final class HistoryService: ObservableObject {
                 dayStart: entry.dayStart,
                 createdAt: entry.createdAt,
                 title: entry.savedTitle,
-                artist: entry.savedArtist,
+                desc: entry.savedDesc,
                 duration: entry.savedDuration,
                 thumbnailURL: entry.savedThumbnailURL,
                 track: resolved
@@ -92,4 +92,3 @@ final class HistoryService: ObservableObject {
         return formatter.string(from: day)
     }
 }
-

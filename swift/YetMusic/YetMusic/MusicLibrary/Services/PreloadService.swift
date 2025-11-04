@@ -18,14 +18,14 @@ final class PreloadService {
     }
     
     func startPreloading(for track: Track) {
-        guard !track.isSaved, let videoId = track.remoteVideoId else { return }
+        guard !track.isSaved else { return }
         guard !inProgress.contains(track.id) else { return }
         inProgress.insert(track.id)
         
         Task.detached { [weak self] in
             guard let self = self else { return }
             do {
-                let streamURL = try await VideoService.shared.fetchStreamURL(videoID: videoId)
+                let streamURL = try await VideoService.shared.fetchStreamURL(videoID: track.id)
                 try await self.downloadAndStore(url: streamURL, for: track)
             } catch {
 

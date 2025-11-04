@@ -52,14 +52,14 @@ class TrackRepository: ObservableObject {
         }
     }
 
-    func findByRemoteVideoId(_ remoteId: Int) -> Track? {
+    func findById(_ id: UUID) -> Track? {
         do {
             var descriptor = FetchDescriptor<Track>()
-            descriptor.predicate = #Predicate { $0.remoteVideoId == remoteId }
+            descriptor.predicate = #Predicate { $0.id == id }
             descriptor.fetchLimit = 1
             return try modelContext.fetch(descriptor).first
         } catch {
-            print("Error fetching track by remote id: \(error)")
+            print("Error fetching track by id: \(error)")
             return nil
         }
     }

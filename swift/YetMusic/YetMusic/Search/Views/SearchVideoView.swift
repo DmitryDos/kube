@@ -13,7 +13,7 @@ struct SearchVideoView: View {
     @ObservedObject private var queueService = QueueService.shared
     @StateObject private var playlistService = PlaylistService.shared
     
-    let video: VideoResult
+    let track: Track
     let onLongPress: () -> Void
     
     @State private var isPressed = false
@@ -25,53 +25,20 @@ struct SearchVideoView: View {
     
     var body: some View {
         ZStack(alignment: .bottom) {
-            AsyncImage(url: URL(string: video.imageURL ?? "")) { phase in
-                switch phase {
-                case .empty:
-                    Rectangle()
-                        .fill(themeObserver.contrastColor)
-                        .overlay(
-                            ProgressView()
-                                .tint(themeObserver.themedAccentColor)
-                        )
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                case .failure:
-                    Rectangle()
-                        .fill(themeObserver.contrastColor)
-                        .overlay(
-                            Image(systemName: "photo")
-                                .foregroundColor(themeObserver.themedPrimaryColor)
-                        )
-                @unknown default:
-                    EmptyView()
-                }
-            }
-            .frame(height: 180)
-            .cornerRadius(12)
-            .clipped()
+            AsyncTrackImage(track: track)
 
             // Информация о видео
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(video.title)
+                    Text(track.title)
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(themeObserver.darkColor)
                         .lineLimit(1)
                     
-                    Text(video.subtitle)
+                    Text(track.desc)
                         .font(.system(size: 12))
                         .foregroundColor(themeObserver.darkColor.opacity(0.7))
                         .lineLimit(1)
-                    
-                    if !video.description.isEmpty {
-                        Text(video.description)
-                            .font(.system(size: 11))
-                            .foregroundColor(themeObserver.darkColor.opacity(0.6))
-                            .lineLimit(2)
-                    }
                 }
                 
                 Spacer()
@@ -104,8 +71,7 @@ struct SearchVideoView: View {
                 Spacer()
             }
             .padding(8)
-            
-            // Кнопка добавления в очередь (справа снизу)
+
             VStack {
                 Spacer()
                 HStack {
@@ -140,43 +106,13 @@ struct SearchVideoView: View {
     }
     
     private func playVideo() {
-        let track = createTrackFromVideo()
         queueService.playTrack(track)
     }
     
     private func addToQueue() {
-        let track = createTrackFromVideo()
         queueService.addToWishlist(track)
     }
-    
-    private func createTrackFromVideo() -> Track {
-        // Проверяем, есть ли уже такой трек
-        if let existingTrack = TrackController.shared.tracks.first(where: { $0.remoteVideoId == video.id }) {
-            return existingTrack
-        }
-        
-        // Используем proxy endpoint для воспроизведения
-        let baseURL = AppConfig.apiBaseURL
-        let proxyURL = "\(baseURL)/api/videos/\(video.id)/stream/proxy"
-        
-        let track = Track(
-            title: video.title,
-            artist: video.subtitle,
-            duration: video.duration,
-            remoteVideoId: video.id,
-            videoURL: proxyURL,
-            thumbnailURL: video.imageURL,
-            ownerUserId: video.userId
-        )
-        
-        // Сохраняем трек в репозиторий
-        let repository = TrackRepository()
-        repository.saveTrack(track)
-        TrackController.shared.tracks.append(track)
-        
-        return track
-    }
-    
+
     private func toggleLike() {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
             showLikeAnimation = true
@@ -187,8 +123,7 @@ struct SearchVideoView: View {
                 showLikeAnimation = false
             }
         }
-        
-        // Здесь логика лайка
-        print("Toggle like for: \(video.title)")
+
+        print("Toggle like for: \(track.title)")
     }
 }

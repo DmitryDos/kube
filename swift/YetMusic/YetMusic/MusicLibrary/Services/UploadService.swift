@@ -24,10 +24,10 @@ final class UploadService {
 
     struct UploadResponse: Codable {
         let message: String
-        let video: Video
+        let video: Track
     }
 
-    func uploadVideo(fileURL: URL) async throws -> Video {
+    func uploadVideo(fileURL: URL) async throws -> Track {
         guard let token = getToken() else {
             throw VideoError.unauthorized
         }

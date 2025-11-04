@@ -33,7 +33,7 @@ struct VerticalPlayerView: View {
                             .multilineTextAlignment(.center)
                             .lineLimit(1)
                         
-                        Text(audio.trackInfo.track?.artist ?? "Unknown Artist")
+                        Text(audio.trackInfo.track?.desc ?? "Empty Description")
                             .font(.title3)
                             .foregroundColor(themeObserver.textColor)
                             .multilineTextAlignment(.center)

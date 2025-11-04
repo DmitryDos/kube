@@ -51,7 +51,7 @@ struct PlaylistTrackView: View {
                         .foregroundColor(themeObserver.darkColor)
                         .lineLimit(1)
                     
-                    Text(track.artist)
+                    Text(track.desc)
                         .font(.system(size: 12))
                         .foregroundColor(themeObserver.darkColor.opacity(0.7))
                         .lineLimit(1)

@@ -30,7 +30,7 @@ private struct HistoryRow: View {
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(themeObserver.textColor)
                     .lineLimit(1)
-                Text(item.artist)
+                Text(item.desc)
                     .font(.system(size: 11))
                     .foregroundColor(themeObserver.primaryGlassColor)
                     .lineLimit(1)

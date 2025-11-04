@@ -28,38 +28,26 @@ class TrackController: ObservableObject {
             .sink { [weak self] remoteVideos in
                 guard let self = self else { return }
                 
-                // Обновляем треки при изменении видео на сервере
-                let remoteTracks = remoteVideos.map { remoteVideo in
-                    Track(
-                        title: remoteVideo.title,
-                        artist: remoteVideo.description,
-                        duration: 0,
-                        remoteVideoId: remoteVideo.id,
-                        videoURL: remoteVideo.fileURL,
-                        thumbnailURL: remoteVideo.thumbnailURL,
-                        ownerUserId: remoteVideo.userId
-                    )
+                // Прямая конвертация RemoteVideo -> Track
+                let remoteTracks = remoteVideos.map { track -> Track in
+                    if let existing = self.tracks.first(where: { $0.id == track.id }) {
+                        track.isSaved = existing.isSaved
+                        track.localFilePath = existing.localFilePath
+                    }
+                    
+                    return track
                 }
-                
-                // Обновляем или добавляем новые треки
+
                 for remoteTrack in remoteTracks {
-                    if let index = self.tracks.firstIndex(where: { $0.remoteVideoId == remoteTrack.remoteVideoId }) {
-                        // Сохраняем локальные поля при обновлении
-                        let existing = self.tracks[index]
-                        remoteTrack.isSaved = existing.isSaved
-                        remoteTrack.localFilePath = existing.localFilePath
+                    if let index = self.tracks.firstIndex(where: { $0.id == remoteTrack.id }) {
                         self.tracks[index] = remoteTrack
                     } else {
                         self.tracks.append(remoteTrack)
                     }
                 }
-                
-                // Удаляем треки, которых больше нет на сервере
+
                 self.tracks.removeAll { track in
-                    if let remoteVideoId = track.remoteVideoId {
-                        return !remoteVideos.contains(where: { $0.id == remoteVideoId })
-                    }
-                    return false // Локальные треки не удаляем
+                    return !remoteVideos.contains(where: { $0.id == track.id })
                 }
             }
             .store(in: &cancellables)
@@ -94,39 +82,29 @@ class TrackController: ObservableObject {
         
         isLoading = true
         
-        // Загружаем удаленные видео (глобальные) с серверной пагинацией и фильтром
         videoService.loadVideos(page: currentPage, pageSize: pageSize, query: currentQuery) { [weak self] remoteVideos in
-            DispatchQueue.main.async {
+            let work: () -> Void = {
                 guard let self = self else { return }
                 
-                // Маппим видео в треки, подтягиваем локальные флаги при наличии
-                let newTracks: [Track] = remoteVideos.compactMap { remoteVideo in
-                    let existing = self.repository.findByRemoteVideoId(remoteVideo.id) ?? self.tracks.first(where: { $0.remoteVideoId == remoteVideo.id })
-                    let t = Track(
-                        title: remoteVideo.title,
-                        artist: remoteVideo.description,
-                        duration: 0,
-                        remoteVideoId: remoteVideo.id,
-                        videoURL: remoteVideo.fileURL,
-                        thumbnailURL: remoteVideo.thumbnailURL,
-                        ownerUserId: remoteVideo.userId
-                    )
-                    if let existing = existing {
-                        t.isSaved = existing.isSaved
-                        t.localFilePath = existing.localFilePath
+                let newTracks: [Track] = remoteVideos.map { track in
+                    if let existing = self.repository.findById(track.id) ?? self.tracks.first(where: { $0.id == track.id }) {
+                        track.isSaved = existing.isSaved
+                        track.localFilePath = existing.localFilePath
                     }
-                    return t
+                    
+                    return track
                 }
-                self.tracks.append(contentsOf: newTracks)
                 
+                self.tracks.append(contentsOf: newTracks)
                 self.canLoadMore = !newTracks.isEmpty
                 self.currentPage += 1
                 self.isLoading = false
             }
+            
+            DispatchQueue.main.async(execute: work)
         }
     }
 
-    // Серверный поиск по "Вся музыка"
     func searchAllMusic(query: String) {
         loadFirstPage(query: query)
     }
@@ -150,16 +128,20 @@ class TrackController: ObservableObject {
                     thumbnail: nil
                 )
             }
-            
+
+            // Прямое создание Track из RemoteVideo
             let track = Track(
+                id: video.id,
                 title: title.isEmpty ? video.title : title,
-                artist: artist.isEmpty ? video.description : artist,
+                desc: artist.isEmpty ? video.desc : artist,
                 duration: 0,
-                remoteVideoId: video.id,
-                videoURL: video.fileURL,
+                videoURL: video.videoURL,
                 thumbnailURL: video.thumbnailURL,
-                ownerUserId: video.userId
+                ownerUserId: video.ownerUserId,
+                dateAdded: video.dateAdded
             )
+            track.fileSize = video.fileSize
+            track.status = video.status
             
             await MainActor.run {
                 tracks.append(track)
@@ -175,39 +157,38 @@ class TrackController: ObservableObject {
     }
     
     func deleteTrack(_ track: Track) throws {
-        // Только автор может удалять
         if let ownerId = track.ownerUserId, let currentId = AuthService.shared.currentUser?.id, ownerId == currentId,
-           track.isRemoteVideo, let videoID = track.remoteVideoId {
+           !track.isSaved {
             Task {
-                do { try await VideoService.shared.deleteVideo(videoID: videoID) } catch { print("Failed to delete remote video: \(error)") }
+                do {
+                    try await VideoService.shared.deleteVideo(videoID: track.id)
+                } catch {
+                    print("Failed to delete remote video: \(error)")
+                }
             }
-        } else {
-            // Нельзя удалять чужие треки с сервера
         }
 
         repository.deleteTrack(track)
         tracks.removeAll { $0.id == track.id }
         objectWillChange.send()
 
-        // Purge from playlists to avoid stale SwiftData references
         PlaylistService.shared.removeTrackFromAllPlaylists(trackId: track.id)
     }
     
-    func updateTrackMetadata(track: Track, newTitle: String, newArtist: String) {
+    func updateTrackMetadata(track: Track, newTitle: String, newDescription: String) {
         if let index = tracks.firstIndex(where: { $0.id == track.id }) {
             tracks[index].title = newTitle
-            tracks[index].artist = newArtist
+            tracks[index].desc = newDescription
             repository.updateTrackMetadata(track: tracks[index])
             objectWillChange.send()
         }
     }
     
-    // Локальный поиск оставим как быстрый фильтр по уже загруженным результатам
     func searchTracks(query: String) -> [Track] {
         guard !query.isEmpty else { return tracks }
         return tracks.filter {
             $0.title.localizedCaseInsensitiveContains(query) ||
-            $0.artist.localizedCaseInsensitiveContains(query)
+            $0.desc.localizedCaseInsensitiveContains(query) // Используем desc для поиска по artist
         }
     }
     

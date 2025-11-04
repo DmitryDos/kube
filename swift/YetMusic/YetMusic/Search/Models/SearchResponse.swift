@@ -1,14 +1,22 @@
 import Foundation
 
 enum SearchResultItem: Identifiable {
-    case video(VideoResult)
+    case video(Track)
     case author(AuthorResult)
     
     var id: String {
         switch self {
-        case .video(let video): return "video_\(video.id)"
+        case .video(let track): return "video_\(track.id)"
         case .author(let author): return "author_\(author.id)"
         }
+    }
+
+    static func == (lhs: SearchResultItem, rhs: SearchResultItem) -> Bool {
+        return lhs.id == rhs.id
+    }
+        
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
 
@@ -34,10 +42,10 @@ struct PaginationInfo: Codable {
 }
 
 struct VideosResponse: Codable {
-    let videos: [VideoResult]
+    let videos: [Track]
 }
 
-struct AuthorResult: Codable {
+struct AuthorResult: Codable, Hashable {
     let id: String
     let title: String
     let subtitle: String
@@ -69,55 +77,18 @@ struct AuthorResult: Codable {
         }
         return UUID(uuidString: uuidString) ?? UUID()
     }
-}
-
-struct VideoResult: Codable {
-    let id: Int
-    let title: String
-    let description: String
-    let userId: Int
-    let fileSize: Int64
-    let fileURL: String
-    let thumbnailURL: String?
-    let status: String
-    let createdAt: Date
     
-    enum CodingKeys: String, CodingKey {
-        case id, title, description, status
-        case userId = "user_id"
-        case fileSize = "file_size"
-        case fileURL = "file_url"
-        case thumbnailURL = "thumbnail_url"
-        case createdAt = "created_at"
+    static func == (lhs: AuthorResult, rhs: AuthorResult) -> Bool {
+        return lhs.id == rhs.id
     }
     
-    // Computed properties for compatibility with views
-    var subtitle: String {
-        return "Автор #\(userId)"
-    }
-    
-    var imageURL: String? {
-        return thumbnailURL ?? fileURL
-    }
-    
-    var duration: TimeInterval {
-        return 0 // Не доступно с сервера
-    }
-    
-    var viewCount: Int {
-        return 0 // Не доступно с сервера
-    }
-    
-    var authorId: UUID {
-        // Генерируем детерминированный UUID из userId
-        var uuidString = "00000000-0000-0000-0000-"
-        uuidString += String(format: "%012d", abs(userId))
-        return UUID(uuidString: uuidString) ?? UUID()
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
 
 enum SearchResult: Codable {
-    case video(VideoResult)
+    case video(Track)
     case author(AuthorResult)
     
     private enum CodingKeys: String, CodingKey {
@@ -130,8 +101,8 @@ enum SearchResult: Codable {
         
         switch type {
         case "video":
-            let video = try container.decode(VideoResult.self, forKey: .data)
-            self = .video(video)
+            let track = try container.decode(Track.self, forKey: .data)
+            self = .video(track)
         case "author":
             let author = try container.decode(AuthorResult.self, forKey: .data)
             self = .author(author)
@@ -144,9 +115,9 @@ enum SearchResult: Codable {
         var container = encoder.container(keyedBy: CodingKeys.self)
         
         switch self {
-        case .video(let video):
+        case .video(let track):
             try container.encode("video", forKey: .type)
-            try container.encode(video, forKey: .data)
+            try container.encode(track, forKey: .data)
         case .author(let author):
             try container.encode("author", forKey: .type)
             try container.encode(author, forKey: .data)
@@ -155,7 +126,7 @@ enum SearchResult: Codable {
     
     var item: SearchResultItem {
         switch self {
-        case .video(let video): return .video(video)
+        case .video(let track): return .video(track)
         case .author(let author): return .author(author)
         }
     }

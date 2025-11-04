@@ -67,7 +67,7 @@ struct PlaylistsView: View {
                 let searchLowercased = searchText.lowercased()
                 return tracks.filter { track in
                     track.title.lowercased().contains(searchLowercased) ||
-                    track.artist.lowercased().contains(searchLowercased)
+                    track.desc.lowercased().contains(searchLowercased)
                 }
             } else {
                 return tracks

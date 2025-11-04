@@ -5,7 +5,7 @@ struct ShowTrackInfoModal: View {
     let track: Track
     let isReadOnly: Bool
     @State private var editedTitle: String
-    @State private var editedArtist: String
+    @State private var editedDescription: String
     @State private var hasChanges: Bool = false
     @StateObject private var alertState = AlertState()
     @State private var selectedThumbnail: UIImage?
@@ -27,7 +27,7 @@ struct ShowTrackInfoModal: View {
         self.track = track
         self.isReadOnly = isReadOnly
         self._editedTitle = State(initialValue: track.title)
-        self._editedArtist = State(initialValue: track.artist)
+        self._editedDescription = State(initialValue: track.desc)
     }
 
     private var saveButton: AnyView? {
@@ -75,7 +75,6 @@ struct ShowTrackInfoModal: View {
             bottomButton: saveButton
         ) {
             VStack(spacing: 20) {
-                // Обложка с возможностью загрузки
                 ZStack(alignment: .bottomTrailing) {
                     if let thumbnail = selectedThumbnail {
                         Image(uiImage: thumbnail)
@@ -117,9 +116,9 @@ struct ShowTrackInfoModal: View {
                     )
                     
                     TextFieldWithLabel(
-                        title: "Исполнитель",
+                        title: "Описание",
                         placeholder: "",
-                        text: $editedArtist,
+                        text: $editedDescription,
                         onChange: checkForChanges,
                         isEditable: canEdit
                     )
@@ -140,36 +139,33 @@ struct ShowTrackInfoModal: View {
     }
 
     private func checkForChanges() {
-        hasChanges = editedTitle != track.title || editedArtist != track.artist || selectedThumbnail != nil
+        hasChanges = editedTitle != track.title || editedDescription != track.desc || selectedThumbnail != nil
     }
     
     private func saveChanges() {
         TrackController.shared.updateTrackMetadata(
             track: track,
             newTitle: editedTitle,
-            newArtist: editedArtist
+            newDescription: editedDescription
         )
-        
-        if let videoID = track.remoteVideoId {
-            Task {
-                do {
-                    if let updatedVideo = try await VideoService.shared.updateVideoMetadata(
-                        videoID: videoID,
-                        title: editedTitle,
-                        description: editedArtist,
-                        thumbnail: selectedThumbnail
-                    ) {
-                        // Обновляем трек с новым thumbnailURL
-                        await MainActor.run {
-                            if let index = TrackController.shared.tracks.firstIndex(where: { $0.id == track.id }) {
-                                TrackController.shared.tracks[index].thumbnailURL = updatedVideo.thumbnailURL
-                                TrackRepository().updateTrackMetadata(track: TrackController.shared.tracks[index])
-                            }
+
+        Task {
+            do {
+                if let updatedVideo = try await VideoService.shared.updateVideoMetadata(
+                    videoID: track.id,
+                    title: editedTitle,
+                    description: editedDescription,
+                    thumbnail: selectedThumbnail
+                ) {
+                    await MainActor.run {
+                        if let index = TrackController.shared.tracks.firstIndex(where: { $0.id == track.id }) {
+                            TrackController.shared.tracks[index].thumbnailURL = updatedVideo.thumbnailURL
+                            TrackRepository().updateTrackMetadata(track: TrackController.shared.tracks[index])
                         }
                     }
-                } catch {
-                    print("Failed to update video metadata: \(error)")
                 }
+            } catch {
+                print("Failed to update video metadata: \(error)")
             }
         }
     }

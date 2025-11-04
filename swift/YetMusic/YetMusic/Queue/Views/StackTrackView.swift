@@ -34,7 +34,7 @@ struct StackTrackView: View {
                     .font(.system(size: isCurrent ? 15 : 13, weight: isCurrent ? .semibold : .medium))
                     .foregroundColor(themeObserver.textColor)
                     .lineLimit(1)
-                Text(track.artist)
+                Text(track.desc)
                     .font(.system(size: isCurrent ? 13 : 11))
                     .foregroundColor(themeObserver.primaryGlassColor)
                     .lineLimit(1)

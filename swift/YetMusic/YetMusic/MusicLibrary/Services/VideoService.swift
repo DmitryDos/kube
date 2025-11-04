@@ -8,30 +8,8 @@
 import Foundation
 import UIKit
 
-struct Video: Codable, Identifiable {
-    let id: Int
-    let title: String
-    let description: String
-    let userId: Int
-    let fileSize: Int64
-    let fileURL: String
-    let thumbnailURL: String?
-    let status: String
-    let createdAt: Date
-    
-    enum CodingKeys: String, CodingKey {
-        case id, title, description
-        case userId = "user_id"
-        case fileSize = "file_size"
-        case fileURL = "file_url"
-        case thumbnailURL = "thumbnail_url"
-        case status
-        case createdAt = "created_at"
-    }
-}
-
 struct VideoResponse: Codable {
-    let videos: [Video]
+    let videos: [Track]
 }
 
 struct CreateVideoRequest: Codable {
@@ -56,7 +34,7 @@ class VideoService: ObservableObject {
         return URLSession(configuration: config)
     }()
     
-    @Published var videos: [Video] = []
+    @Published var videos: [Track] = []
     
     private init() {
         // Убираем loadVideos() из init, т.к. теперь требуется пагинация
@@ -64,7 +42,7 @@ class VideoService: ObservableObject {
 
     struct StreamURLResponse: Codable { let url: String }
 
-    func fetchStreamURL(videoID: Int) async throws -> URL {
+    func fetchStreamURL(videoID: UUID) async throws -> URL {
         guard let token = getToken() else { throw VideoError.unauthorized }
         guard let url = URL(string: baseURL + "/api/videos/\(videoID)/stream/url") else { throw VideoError.invalidURL }
         var request = URLRequest(url: url)
@@ -79,7 +57,7 @@ class VideoService: ObservableObject {
         return finalURL
     }
 
-    func deleteVideo(videoID: Int) async throws {
+    func deleteVideo(videoID: UUID) async throws {
         guard let token = getToken() else { throw VideoError.unauthorized }
         guard let url = URL(string: baseURL + "/api/videos/\(videoID)") else { throw VideoError.invalidURL }
         var request = URLRequest(url: url)
@@ -93,10 +71,10 @@ class VideoService: ObservableObject {
     
     struct UpdateVideoResponse: Codable {
         let message: String
-        let video: Video?
+        let video: Track?
     }
     
-    func updateVideoMetadata(videoID: Int, title: String? = nil, description: String? = nil, thumbnail: UIImage? = nil) async throws -> Video? {
+    func updateVideoMetadata(videoID: UUID, title: String? = nil, description: String? = nil, thumbnail: UIImage? = nil) async throws -> Track? {
         guard let token = getToken() else { throw VideoError.unauthorized }
         guard let url = URL(string: baseURL + "/api/videos/\(videoID)") else { throw VideoError.invalidURL }
         
@@ -174,7 +152,7 @@ class VideoService: ObservableObject {
         UserDefaults.standard.string(forKey: tokenKey)
     }
     
-    func loadVideos(page: Int = 0, pageSize: Int = 20, query: String? = nil, userId: Int? = nil, mine: Bool = false, completion: @escaping ([Video]) -> Void) {
+    func loadVideos(page: Int = 0, pageSize: Int = 20, query: String? = nil, userId: Int? = nil, mine: Bool = false, completion: @escaping ([Track]) -> Void) {
         guard let token = getToken() else {
             completion([])
             return
