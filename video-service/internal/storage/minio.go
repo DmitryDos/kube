@@ -110,10 +110,18 @@ func (m *MinIOClient) GetObjectRange(ctx context.Context, objectName string, sta
     opts := minio.GetObjectOptions{}
     if start >= 0 {
         if end >= 0 {
-            if err := opts.SetRange(start, end); err != nil { return nil, err }
-        } else {
-            if err := opts.SetRange(start, 0); err != nil { return nil, err }
+            // Конкретный диапазон
+            if err := opts.SetRange(start, end); err != nil {
+                return nil, err
+            }
+        } else if start > 0 {
+            // end < 0 и start > 0 - получить с start до конца
+            // MinIO SetRange требует конкретное значение, используем очень большое число
+            if err := opts.SetRange(start, 9223372036854775807); err != nil {
+                return nil, err
+            }
         }
+        // Если start = 0 и end < 0, не устанавливаем range - получаем весь объект
     }
     return m.client.GetObject(ctx, m.bucket, objectName, opts)
 }

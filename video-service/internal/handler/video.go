@@ -3,6 +3,7 @@ package handler
 import (
     "fmt"
     "io"
+    "log"
     "net/http"
     "regexp"
     "strconv"
@@ -353,24 +354,37 @@ func (h *VideoHandler) GetThumbnail(c *gin.Context) {
     }
 
     ctx := c.Request.Context()
-    _, contentType, err := h.service.StatObject(ctx, video.ThumbnailPath.String)
+    totalSize, contentType, err := h.service.StatObject(ctx, video.ThumbnailPath.String)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get thumbnail info"})
         return
     }
 
+    log.Printf("[GetThumbnail] Video ID: %d, Path: %s, Size: %d, ContentType: %s", videoID, video.ThumbnailPath.String, totalSize, contentType)
+
     obj, err := h.service.GetObjectRange(ctx, video.ThumbnailPath.String, 0, -1)
     if err != nil {
+        log.Printf("[GetThumbnail] Error getting object: %v", err)
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get thumbnail"})
         return
     }
     defer obj.Close()
 
+    // Убеждаемся, что Content-Type правильный
+    if contentType == "" {
+        contentType = "image/jpeg"
+    }
+    
     c.Header("Content-Type", contentType)
     c.Header("Cache-Control", "public, max-age=3600")
-    if _, err := io.Copy(c.Writer, obj); err != nil {
+    c.Header("Content-Length", strconv.FormatInt(totalSize, 10))
+    
+    bytesWritten, err := io.Copy(c.Writer, obj)
+    if err != nil {
+        log.Printf("[GetThumbnail] Error copying data: %v, bytes written: %d", err, bytesWritten)
         return
     }
+    log.Printf("[GetThumbnail] Successfully sent %d bytes", bytesWritten)
 }
 
 func (h *VideoHandler) DeleteVideo(c *gin.Context) {

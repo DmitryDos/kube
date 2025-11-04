@@ -101,17 +101,30 @@ struct AsyncTrackImage: View {
                 
                 if let httpResponse = response as? HTTPURLResponse {
                     print("[AsyncTrackImage] Thumbnail response status: \(httpResponse.statusCode)")
+                    print("[AsyncTrackImage] Content-Type: \(httpResponse.value(forHTTPHeaderField: "Content-Type") ?? "unknown")")
                     if httpResponse.statusCode != 200 {
                         print("[AsyncTrackImage] Non-200 status code")
                         return
                     }
                 }
                 
-                if let data = data, let image = UIImage(data: data) {
+                guard let data = data else {
+                    print("[AsyncTrackImage] No data received")
+                    return
+                }
+                
+                print("[AsyncTrackImage] Received data size: \(data.count) bytes")
+                print("[AsyncTrackImage] First 20 bytes: \(data.prefix(20).map { String(format: "%02x", $0) }.joined(separator: " "))")
+                
+                if let image = UIImage(data: data) {
                     print("[AsyncTrackImage] Successfully loaded thumbnail, size: \(data.count) bytes")
                     self.image = image
                 } else {
-                    print("[AsyncTrackImage] Failed to create image from data")
+                    print("[AsyncTrackImage] Failed to create image from data (size: \(data.count) bytes)")
+                    // Попробуем проверить, что это за данные
+                    if let stringData = String(data: data, encoding: .utf8) {
+                        print("[AsyncTrackImage] Data as string (first 200 chars): \(String(stringData.prefix(200)))")
+                    }
                 }
             }
         }
