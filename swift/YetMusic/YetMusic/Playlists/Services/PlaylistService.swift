@@ -5,7 +5,6 @@ class PlaylistService: ObservableObject {
     static let shared = PlaylistService()
     
     static let likedPlaylistID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
-    static let allMusicPlaylistID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
     static let yourTracksPlaylistID = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
     
     @Published var playlists: [Playlist] = []
@@ -30,10 +29,8 @@ class PlaylistService: ObservableObject {
             } else {
                 self.playlists = fetchedPlaylists
                 purgeInvalidTrackReferences()
-                print("✅ Loaded \(fetchedPlaylists.count) playlists from SwiftData")
             }
         } catch {
-            print("❌ Error loading playlists: \(error)")
             createSystemPlaylists()
         }
     }
@@ -42,16 +39,13 @@ class PlaylistService: ObservableObject {
         let context = modelContext
         
         let likedPlaylist = Playlist(id: PlaylistService.likedPlaylistID, name: "Понравившееся", isSystem: true)
-        let allMusicPlaylist = Playlist(id: PlaylistService.allMusicPlaylistID, name: "Вся музыка", isSystem: true)
         let yourTracks = Playlist(id: PlaylistService.yourTracksPlaylistID, name: "Ваши треки", isSystem: true)
         
         context.insert(likedPlaylist)
-        context.insert(allMusicPlaylist)
         context.insert(yourTracks)
         
         if saveContext() {
-            playlists = [likedPlaylist, allMusicPlaylist, yourTracks]
-            print("✅ Created system playlists in SwiftData")
+            playlists = [likedPlaylist, yourTracks]
         } else {
             createSystemPlaylistsInMemory()
         }
@@ -59,11 +53,9 @@ class PlaylistService: ObservableObject {
     
     private func createSystemPlaylistsInMemory() {
         let likedPlaylist = Playlist(id: PlaylistService.likedPlaylistID, name: "Понравившееся", isSystem: true)
-        let allMusicPlaylist = Playlist(id: PlaylistService.allMusicPlaylistID, name: "Вся музыка", isSystem: true)
         let yourTracks = Playlist(id: PlaylistService.yourTracksPlaylistID, name: "Ваши треки", isSystem: true)
 
-        playlists = [likedPlaylist, allMusicPlaylist, yourTracks]
-        print("✅ Created system playlists in memory")
+        playlists = [likedPlaylist, yourTracks]
     }
     
     // MARK: - Public Methods
@@ -79,9 +71,7 @@ class PlaylistService: ObservableObject {
     func getTracksForPlaylist(_ playlistID: UUID) -> [Track] {
         guard let playlist = getPlaylist(by: playlistID) else { return [] }
         
-        if playlistID == PlaylistService.allMusicPlaylistID {
-            return TrackController.shared.tracks
-        } else if playlistID == PlaylistService.yourTracksPlaylistID {
+        if playlistID == PlaylistService.yourTracksPlaylistID {
             let currentUserId = AuthService.shared.currentUser?.id
             return TrackController.shared.tracks.filter { $0.ownerUserId == currentUserId }
         } else {

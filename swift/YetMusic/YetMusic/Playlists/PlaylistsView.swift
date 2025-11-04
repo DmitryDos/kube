@@ -38,7 +38,7 @@ struct PlaylistsView: View {
         let searchLowercased = searchText.lowercased()
         
         return allPlaylists.filter { playlist in
-            if playlist.id == PlaylistService.likedPlaylistID || playlist.id == PlaylistService.allMusicPlaylistID {
+            if playlist.id == PlaylistService.likedPlaylistID {
                 return true
             }
 
@@ -61,9 +61,7 @@ struct PlaylistsView: View {
         
         let tracks: [Track]
         
-        if playlist.id == PlaylistService.allMusicPlaylistID {
-            tracks = filteredTracksForAllMusic()
-        } else if playlist.id == PlaylistService.likedPlaylistID {
+        if playlist.id == PlaylistService.likedPlaylistID {
             tracks = playlistService.getTracksForPlaylist(playlist.id)
             if !searchText.isEmpty {
                 let searchLowercased = searchText.lowercased()
@@ -283,7 +281,7 @@ struct PlaylistsView: View {
     }
     
     private func isSystemPlaylist(_ id: UUID) -> Bool {
-        return id == PlaylistService.likedPlaylistID || id == PlaylistService.allMusicPlaylistID
+        return id == PlaylistService.likedPlaylistID
     }
 }
 

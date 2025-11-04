@@ -62,24 +62,35 @@ func main() {
     videoRepo := repository.NewVideoRepository(db)
     videoService := service.NewVideoService(videoRepo, minioClient)
     videoHandler := handler.NewVideoHandler(videoService)
+    searchHandler := handler.NewSearchHandler(videoService)
     healthHandler := handler.NewHealthHandler()
 
     r := gin.Default()
     
     r.GET("/health", healthHandler.HealthCheck)
-    
-    protected := r.Group("/api/videos")
-    protected.Use(handler.AuthenticateJWT())
-    {
-        protected.POST("/upload", videoHandler.UploadVideo)
-        protected.POST("/upload/raw", videoHandler.UploadVideoRaw)
-        protected.GET("/", videoHandler.GetVideos)
-        protected.GET("/all", videoHandler.SearchAllVideos)
-        protected.GET("/:id/stream", videoHandler.StreamVideo)
-        protected.GET("/:id/stream/url", videoHandler.GetStreamURL)
-        protected.GET("/:id/stream/proxy", videoHandler.StreamVideoProxy)
-        protected.DELETE("/:id", videoHandler.DeleteVideo)
-    }
+
+    api := r.Group("/api")
+        {
+            // Публичные эндпоинты
+            api.GET("/search", searchHandler.SearchVideosAndAuthors)
+            api.GET("/videos/:id/stream", videoHandler.StreamVideo)
+            api.GET("/videos/:id/stream/url", videoHandler.GetStreamURL)
+            api.GET("/videos/:id/stream/proxy", videoHandler.StreamVideoProxy)
+
+            // Защищенные эндпоинты (подгруппа с middleware)
+            protected := api.Group("")
+            protected.Use(handler.AuthenticateJWT())
+            {
+                videosGroup := protected.Group("/videos")
+                {
+                    videosGroup.POST("/upload", videoHandler.UploadVideo)
+                    videosGroup.POST("/upload/raw", videoHandler.UploadVideoRaw)
+                    videosGroup.GET("/", videoHandler.GetVideos)
+                    videosGroup.GET("/all", videoHandler.SearchAllVideos)
+                    videosGroup.DELETE("/:id", videoHandler.DeleteVideo)
+                }
+            }
+        }
 
     port := ":3001"
     

@@ -46,15 +46,23 @@ struct MainContentView: View {
     @State private var scrollOffset: CGFloat = 0
 
     private var pages: [AnyView] {
-        [
+        var pagesArray: [AnyView] = [
             AnyView(FullPlayerView().statusBar(hidden: orientation.isLandscape)),
             AnyView(QueueView().padding(.horizontal, orientation.isLandscape ? 92 : 16).padding(.top, orientation.isLandscape ? 24 : 6)),
-            AnyView(PlaylistsView().padding(.horizontal, orientation.isLandscape ? 92 : 8).padding(.top, orientation.isLandscape ? 22 : 6)),
-            AnyView(AuthView(authService: AuthService.shared).padding(.horizontal, orientation.isLandscape ? 92 : 0))
+            AnyView(SearchView().padding(.horizontal, orientation.isLandscape ? 92 : 8).padding(.top, orientation.isLandscape ? 22 : 6)),
+            AnyView(AuthView(authService: AuthService.shared).padding(.horizontal, orientation.isLandscape ? 92 : 0)),
         ]
+        
+        if AuthService.shared.isAuthenticated {
+            pagesArray.append(
+                AnyView(PlaylistsView().padding(.horizontal, orientation.isLandscape ? 92 : 8).padding(.top, orientation.isLandscape ? 22 : 6))
+            )
+        }
+        
+        return pagesArray
     }
-
-    @State private var pageOffsets: [CGFloat] = Array(repeating: 0, count: 4)
+    
+    @State private var pageOffsets: [CGFloat] = Array(repeating: 0, count: 5)
     
     var body: some View {
         GeometryReader { geo in
