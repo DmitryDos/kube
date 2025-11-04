@@ -70,29 +70,26 @@ func main() {
     r.GET("/health", healthHandler.HealthCheck)
 
     api := r.Group("/api")
+    {
+        protected := api.Group("")
+        protected.Use(handler.AuthenticateJWT())
         {
-            // Публичные эндпоинты
-            api.GET("/search", searchHandler.SearchVideosAndAuthors)
-            api.GET("/videos/:id/stream", videoHandler.StreamVideo)
-            api.GET("/videos/:id/stream/url", videoHandler.GetStreamURL)
-            api.GET("/videos/:id/stream/proxy", videoHandler.StreamVideoProxy)
-
-            // Защищенные эндпоинты (подгруппа с middleware)
-            protected := api.Group("")
-            protected.Use(handler.AuthenticateJWT())
+            videosGroup := protected.Group("/videos")
             {
-                videosGroup := protected.Group("/videos")
-                {
-                    videosGroup.POST("/upload", videoHandler.UploadVideo)
-                    videosGroup.POST("/upload/raw", videoHandler.UploadVideoRaw)
-                    videosGroup.GET("/", videoHandler.GetVideos)
-                    videosGroup.GET("/all", videoHandler.SearchAllVideos)
-                    videosGroup.PUT("/:id", videoHandler.UpdateVideoMetadata)
-                    videosGroup.PATCH("/:id", videoHandler.UpdateVideoMetadata)
-                    videosGroup.DELETE("/:id", videoHandler.DeleteVideo)
-                }
+                videosGroup.POST("/upload", videoHandler.UploadVideo)
+                videosGroup.POST("/upload/raw", videoHandler.UploadVideoRaw)
+                videosGroup.GET("/all", videoHandler.SearchAllVideos)
+                videosGroup.PUT("/:id", videoHandler.UpdateVideoMetadata)
+                videosGroup.PATCH("/:id", videoHandler.UpdateVideoMetadata)
+                videosGroup.DELETE("/:id", videoHandler.DeleteVideo)
             }
         }
+
+        api.GET("/search", searchHandler.SearchVideosAndAuthors)
+        api.GET("/videos/:id/stream", videoHandler.StreamVideo)
+        api.GET("/videos/:id/stream/url", videoHandler.GetStreamURL)
+        api.GET("/videos/:id/stream/proxy", videoHandler.StreamVideoProxy)
+    }
 
     port := ":3001"
     

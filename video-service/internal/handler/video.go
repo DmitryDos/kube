@@ -3,7 +3,6 @@ package handler
 import (
     "io"
     "net/http"
-    "path/filepath"
     "regexp"
     "strconv"
     "video-service/internal/model"

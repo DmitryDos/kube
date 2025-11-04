@@ -4,7 +4,6 @@ import (
     "net/http"
     "strconv"
     "video-service/internal/model"
-    "video-service/internal/service"
 
     "github.com/gin-gonic/gin"
 )

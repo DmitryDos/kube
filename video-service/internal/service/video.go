@@ -247,3 +247,75 @@ func (s *VideoService) CreateVideoStream(userID int, reader io.Reader, filename 
 
     return video, nil
 }
+// UpdateVideoMetadata updates video title and description
+func (s *VideoService) UpdateVideoMetadata(userID, videoID int, req *model.UpdateVideoMetadataRequest) error {
+    // Проверяем ownership
+    video, err := s.repo.FindByID(videoID)
+    if err != nil {
+        return err
+    }
+    
+    if video.UserID != userID {
+        return errors.New("video not found or access denied")
+    }
+
+    // Обновляем метаданные
+    return s.repo.UpdateMetadata(videoID, req.Title, req.Description)
+}
+
+// UpdateVideoThumbnail updates video thumbnail
+func (s *VideoService) UpdateVideoThumbnail(userID, videoID int, fileHeader *model.FileHeader) error {
+    // Проверяем ownership
+    video, err := s.repo.FindByID(videoID)
+    if err != nil {
+        return err
+    }
+    
+    if video.UserID != userID {
+        return errors.New("video not found or access denied")
+    }
+
+    // Создаем временный файл для thumbnail
+    tempDir := filepath.Join("temp", fmt.Sprintf("%d", userID))
+    if err := os.MkdirAll(tempDir, 0755); err != nil {
+        return err
+    }
+
+    hash := md5.Sum([]byte(fmt.Sprintf("thumb_%d_%s_%d", userID, fileHeader.Filename, time.Now().UnixNano())))
+    fileName := hex.EncodeToString(hash[:]) + filepath.Ext(fileHeader.Filename)
+    tempFilePath := filepath.Join(tempDir, fileName)
+
+    tempFile, err := os.Create(tempFilePath)
+    if err != nil {
+        return err
+    }
+    defer tempFile.Close()
+
+    if _, err := io.Copy(tempFile, fileHeader.File); err != nil {
+        return err
+    }
+
+    // Загружаем в MinIO
+    ctx := context.Background()
+    objectName := fmt.Sprintf("user-%d/thumbnails/%s", userID, fileName)
+    
+    if err := s.storage.UploadFile(ctx, objectName, tempFilePath, fileHeader.Size); err != nil {
+        os.Remove(tempFilePath)
+        return err
+    }
+
+    // Удаляем старый thumbnail если есть
+    if video.ThumbnailPath != "" {
+        s.storage.DeleteFile(ctx, video.ThumbnailPath)
+    }
+
+    // Обновляем путь в БД
+    if err := s.repo.UpdateThumbnail(videoID, objectName); err != nil {
+        // Откатываем загрузку если обновление БД не удалось
+        s.storage.DeleteFile(ctx, objectName)
+        return err
+    }
+
+    os.Remove(tempFilePath)
+    return nil
+}
