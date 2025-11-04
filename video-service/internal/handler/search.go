@@ -2,6 +2,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"video-service/internal/service"
@@ -19,10 +20,19 @@ func NewSearchHandler(videoService *service.VideoService) *SearchHandler {
 
 // SearchVideosAndAuthors возвращает объединенные результаты поиска
 func (h *SearchHandler) SearchVideosAndAuthors(c *gin.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[SearchHandler] Panic recovered: %v", r)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		}
+	}()
+
 	q := c.DefaultQuery("q", "")
 	pageStr := c.DefaultQuery("page", "1")
 	limitStr := c.DefaultQuery("limit", "20")
 	filter := c.DefaultQuery("filter", "all")
+
+	log.Printf("[SearchHandler] Search request: q=%s, page=%s, limit=%s, filter=%s", q, pageStr, limitStr, filter)
 
 	page, _ := strconv.Atoi(pageStr)
 	limit, _ := strconv.Atoi(limitStr)
@@ -61,6 +71,7 @@ func (h *SearchHandler) SearchVideosAndAuthors(c *gin.Context) {
 		// Только видео
 		videos, err := h.videoService.GetAllVideosPaginated(q, nil, page-1, limit)
 		if err != nil {
+			log.Printf("[SearchHandler] Error searching videos: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search videos"})
 			return
 		}
@@ -86,12 +97,19 @@ func (h *SearchHandler) SearchVideosAndAuthors(c *gin.Context) {
 		// Все результаты (и видео, и авторы)
 		videos, err := h.videoService.GetAllVideosPaginated(q, nil, page-1, limit)
 		if err != nil {
+			log.Printf("[SearchHandler] Error searching videos: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search videos"})
 			return
 		}
 
-		authors, err := h.searchAuthors(q, limit/2, offset/2) // Делим лимит между типами
+		authorLimit := limit / 2
+		if authorLimit < 1 {
+			authorLimit = 1
+		}
+		authorOffset := offset / 2
+		authors, err := h.searchAuthors(q, authorLimit, authorOffset) // Делим лимит между типами
 		if err != nil {
+			log.Printf("[SearchHandler] Error searching authors: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search authors"})
 			return
 		}
