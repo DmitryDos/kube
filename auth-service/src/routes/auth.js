@@ -1,7 +1,9 @@
 import express from 'express';
+import { v4 as uuidv4 } from 'uuid';
 import { User } from '../models/User.js';
 import { AuthUtils } from '../utils/auth.js';
 import { authenticateToken } from '../middleware/auth.js';
+import pool from '../utils/database.js';
 
 const router = express.Router();
 
@@ -35,12 +37,21 @@ router.post('/register', async (req, res) => {
             name: name || email.split('@')[0]
         });
 
-        const token = AuthUtils.generateToken(user.id);
+        // Проверяем формат ID (новый пользователь должен иметь UUID из схемы)
+        let userId;
+        if (typeof user.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)) {
+            userId = user.id;
+        } else {
+            // Если по какой-то причине не UUID, конвертируем
+            userId = String(user.id);
+        }
+
+        const token = AuthUtils.generateToken(userId);
 
         res.status(201).json({
             message: 'User created successfully',
             user: {
-                id: String(user.id), // Конвертируем в строку для совместимости с UUID
+                id: userId,
                 email: user.email,
                 name: user.name
             },
@@ -78,12 +89,33 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid credentials' });
         }
 
-        const token = AuthUtils.generateToken(user.id);
+        console.log('[Login] User from DB:', { id: user.id, idType: typeof user.id, idValue: user.id });
+
+        // Проверяем формат ID и конвертируем в UUID если нужно
+        let userId;
+        if (typeof user.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)) {
+            // Уже валидный UUID
+            userId = user.id;
+        } else if ((typeof user.id === 'string' && /^\d+$/.test(user.id)) || typeof user.id === 'number') {
+            // Это число или строка с числом (старый формат)
+            // ВАЖНО: Нужно выполнить миграцию 002_migrate_user_id_to_uuid.sql вручную!
+            console.error('[Login] ERROR: User ID is integer format. Please run migration 002_migrate_user_id_to_uuid.sql');
+            console.error('[Login] User ID:', user.id, 'Type:', typeof user.id);
+            // Временно генерируем UUID для ответа, но база останется со старым форматом
+            // Это нужно исправить миграцией!
+            userId = uuidv4();
+            console.warn('[Login] WARNING: Returning temporary UUID, but database still has integer ID. Migration required!');
+        } else {
+            // PostgreSQL UUID объект - конвертируем в строку
+            userId = String(user.id);
+        }
+
+        const token = AuthUtils.generateToken(userId);
 
         res.json({
             message: 'Login successful',
             user: {
-                id: String(user.id), // Конвертируем в строку для совместимости с UUID
+                id: userId,
                 email: user.email,
                 name: user.name
             },
@@ -103,9 +135,17 @@ router.get('/profile', authenticateToken, async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
+        // Проверяем формат ID
+        let userId;
+        if (typeof user.id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)) {
+            userId = user.id;
+        } else {
+            userId = String(user.id);
+        }
+
         res.json({ 
             user: {
-                id: String(user.id), // Конвертируем в строку для совместимости с UUID
+                id: userId,
                 email: user.email,
                 name: user.name,
                 created_at: user.created_at
