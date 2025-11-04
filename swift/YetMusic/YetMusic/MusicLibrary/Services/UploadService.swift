@@ -27,26 +27,35 @@ final class UploadService {
         let video: Video
     }
 
-    func uploadVideo(fileURL: URL, title: String, description: String = "") async throws -> Video {
+    func uploadVideo(fileURL: URL) async throws -> Video {
         guard let token = getToken() else {
             throw VideoError.unauthorized
         }
 
-        guard var components = URLComponents(string: baseURL + "/api/videos/upload/raw") else {
+        guard let url = URL(string: baseURL + "/api/videos/upload") else {
             throw VideoError.invalidURL
         }
-        var queryItems: [URLQueryItem] = [URLQueryItem(name: "title", value: title)]
-        if !description.isEmpty { queryItems.append(URLQueryItem(name: "description", value: description)) }
-        components.queryItems = queryItems
-        guard let url = components.url else { throw VideoError.invalidURL }
 
+        let boundary = UUID().uuidString
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("video/mp4", forHTTPHeaderField: "Content-Type")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 600
 
-        let (data, response) = try await session.upload(for: request, fromFile: fileURL)
+        var body = Data()
+        body.append("--\(boundary)\r\n")
+        body.append("Content-Disposition: form-data; name=\"video\"; filename=\"\(fileURL.lastPathComponent)\"\r\n")
+        body.append("Content-Type: video/mp4\r\n\r\n")
+        
+        let videoData = try Data(contentsOf: fileURL)
+        body.append(videoData)
+        body.append("\r\n")
+        body.append("--\(boundary)--\r\n")
+        
+        request.httpBody = body
+
+        let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw VideoError.invalidResponse
@@ -61,6 +70,7 @@ final class UploadService {
         return uploadResponse.video
     }
 }
+
 // Reuse same tolerant date decoder as VideoService
 private func makeDecoder() -> JSONDecoder {
     let decoder = JSONDecoder()
@@ -76,5 +86,13 @@ private func makeDecoder() -> JSONDecoder {
         throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date: \(dateString)")
     }
     return decoder
+}
+
+extension Data {
+    mutating func append(_ string: String) {
+        if let data = string.data(using: .utf8) {
+            append(data)
+        }
+    }
 }
 

@@ -99,22 +99,21 @@ struct PlaylistsView: View {
 
     private var searchBar: some View {
         HStack {
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.black)
-                
-                TextField("Поиск треков и плейлистов", text: $searchText)
-                    .textFieldStyle(PlainTextFieldStyle())
-                    .foregroundColor(.black)
-                    .onChange(of: searchText) { _ in scheduleDebouncedServerSearch() }
-            }
-            .padding(10)
-            .background(themeObserver.lightGlassColor)
-            .cornerRadius(50)
+            ExpandableSearchBar(
+                text: $searchText,
+                placeholder: "Поиск треков и плейлистов",
+                onSubmit: {
+                    triggerServerSearchNow()
+                },
+                onClear: {
+                    trackController.loadFirstPage(query: nil)
+                }
+            )
+            
+            Spacer()
+                .frame(width: isLandscape ? 0 : 54)
         }
-        .padding(.horizontal, 8)
-        .padding(.trailing, isLandscape ? 0 : 62)
-        .padding(.bottom, 16)
+        .onChange(of: searchText) { _ in scheduleDebouncedServerSearch() }
     }
 
     private func scheduleDebouncedServerSearch() {
@@ -203,7 +202,7 @@ struct PlaylistsView: View {
                         showTrackInfoModal(for: track)
                     },
                     onPlaylistLongPress: {
-                        if !isSystemPlaylist(playlist.id) && !isEditingPlaylist {
+                        if !isSystemPlaylist(playlist.id) && !isEditingPlaylist && playlist.id != PlaylistService.yourTracksPlaylistID {
                             startPlaylistEditing(playlist.id)
                         }
                     }
@@ -281,7 +280,7 @@ struct PlaylistsView: View {
     }
     
     private func isSystemPlaylist(_ id: UUID) -> Bool {
-        return id == PlaylistService.likedPlaylistID
+        return id == PlaylistService.likedPlaylistID || id == PlaylistService.yourTracksPlaylistID
     }
 }
 

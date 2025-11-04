@@ -24,7 +24,7 @@ func NewVideoService(repo *repository.VideoRepository, storage *storage.MinIOCli
     return &VideoService{repo: repo, storage: storage}
 }
 
-func (s *VideoService) CreateVideo(userID int, req *model.CreateVideoRequest, fileHeader *model.FileHeader) (*model.Video, error) {
+func (s *VideoService) CreateVideoFile(userID int, fileHeader *model.FileHeader) (*model.Video, error) {
     tempDir := filepath.Join("temp", fmt.Sprintf("%d", userID))
     if err := os.MkdirAll(tempDir, 0755); err != nil {
         return nil, err
@@ -52,19 +52,18 @@ func (s *VideoService) CreateVideo(userID int, req *model.CreateVideoRequest, fi
     }
 
     video := &model.Video{
-        Title:       req.Title,
-        Description: req.Description,
-        FilePath:    objectName,
-        FileSize:    fileHeader.Size,
-        UserID:      userID,
-        Status:      "ready",
+        Title:        "",
+        Description:  "",
+        FilePath:     objectName,
+        FileSize:     fileHeader.Size,
+        ThumbnailPath: "",
+        UserID:       userID,
+        Status:       "ready",
     }
 
     if err := s.repo.Create(video); err != nil {
         ctx := context.Background()
-        if delErr := s.storage.DeleteFile(ctx, objectName); delErr != nil {
-            fmt.Printf("Warning: failed to delete object %s from MinIO: %v\n", objectName, delErr)
-        }
+        s.storage.DeleteFile(ctx, objectName)
         os.Remove(tempFilePath)
         return nil, err
     }
@@ -93,15 +92,21 @@ func (s *VideoService) GetUserVideosPaginated(userID, page, pageSize int) ([]mod
             fileURL = ""
         }
 
+        var thumbnailURL string
+        if video.ThumbnailPath != "" {
+            thumbnailURL, _ = s.storage.GeneratePresignedURL(ctx, video.ThumbnailPath)
+        }
+
         response = append(response, model.VideoResponse{
-            ID:          video.ID,
-            Title:       video.Title,
-            Description: video.Description,
-            UserID:      video.UserID,
-            FileSize:    video.FileSize,
-            FileURL:     fileURL,
-            Status:      video.Status,
-            CreatedAt:   video.CreatedAt,
+            ID:           video.ID,
+            Title:        video.Title,
+            Description:  video.Description,
+            UserID:       video.UserID,
+            FileSize:     video.FileSize,
+            FileURL:      fileURL,
+            ThumbnailURL: thumbnailURL,
+            Status:       video.Status,
+            CreatedAt:    video.CreatedAt,
         })
     }
 
@@ -124,15 +129,21 @@ func (s *VideoService) GetAllVideosPaginated(query string, userID *int, page, pa
             fileURL = ""
         }
 
+        var thumbnailURL string
+        if video.ThumbnailPath != "" {
+            thumbnailURL, _ = s.storage.GeneratePresignedURL(ctx, video.ThumbnailPath)
+        }
+
         response = append(response, model.VideoResponse{
-            ID:          video.ID,
-            Title:       video.Title,
-            Description: video.Description,
-            UserID:      video.UserID,
-            FileSize:    video.FileSize,
-            FileURL:     fileURL,
-            Status:      video.Status,
-            CreatedAt:   video.CreatedAt,
+            ID:           video.ID,
+            Title:        video.Title,
+            Description:  video.Description,
+            UserID:       video.UserID,
+            FileSize:     video.FileSize,
+            FileURL:      fileURL,
+            ThumbnailURL: thumbnailURL,
+            Status:       video.Status,
+            CreatedAt:    video.CreatedAt,
         })
     }
 
@@ -184,19 +195,17 @@ func (s *VideoService) DeleteVideo(userID, videoID int) error {
     if video.UserID != userID { return errors.New("video not found") }
     ctx := context.Background()
     _ = s.storage.DeleteFile(ctx, video.FilePath)
+    if video.ThumbnailPath != "" {
+        _ = s.storage.DeleteFile(ctx, video.ThumbnailPath)
+    }
     return s.repo.DeleteByID(videoID)
 }
 
 // CreateVideoStream uploads the provided reader directly to storage and creates a DB record.
 // If size is unknown, pass size = -1 and a suitable contentType (e.g., "video/mp4").
-func (s *VideoService) CreateVideoStream(userID int, req *model.CreateVideoRequest, reader io.Reader, filename string, size int64, contentType string) (*model.Video, error) {
-    if req == nil || req.Title == "" {
-        return nil, errors.New("title is required")
-    }
-
+func (s *VideoService) CreateVideoStream(userID int, reader io.Reader, filename string, size int64, contentType string) (*model.Video, error) {
     ext := filepath.Ext(filename)
     if ext == "" {
-        // Fallback based on content type
         if contentType == "video/mp4" {
             ext = ".mp4"
         } else {
@@ -221,17 +230,18 @@ func (s *VideoService) CreateVideoStream(userID int, req *model.CreateVideoReque
     }
 
     video := &model.Video{
-        Title:       req.Title,
-        Description: req.Description,
-        FilePath:    objectName,
-        FileSize:    finalSize,
-        UserID:      userID,
-        Status:      "ready",
+        Title:        "",
+        Description:  "",
+        FilePath:     objectName,
+        FileSize:     finalSize,
+        ThumbnailPath: "",
+        UserID:       userID,
+        Status:       "ready",
     }
 
     if err := s.repo.Create(video); err != nil {
         ctx := context.Background()
-        _ = s.storage.DeleteFile(ctx, objectName)
+        s.storage.DeleteFile(ctx, objectName)
         return nil, err
     }
 

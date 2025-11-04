@@ -13,6 +13,8 @@ struct AddTrackModal: View {
     @State private var selectedFileURL: URL?
     @State private var showMetadataFields: Bool = false
     @State private var downloadedURL: URL?
+    @State private var selectedThumbnail: UIImage?
+    @State private var showImagePicker: Bool = false
     
     enum ImportMethod {
         case url, file
@@ -71,6 +73,39 @@ struct AddTrackModal: View {
                         Text("Информация о треке")
                             .font(.headline)
                             .foregroundColor(themeObserver.textColor)
+                        
+                        // Обложка
+                        ZStack(alignment: .bottomTrailing) {
+                            if let thumbnail = selectedThumbnail {
+                                Image(uiImage: thumbnail)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(height: 200)
+                                    .cornerRadius(12)
+                                    .clipped()
+                            } else {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .fill(themeObserver.contrastColor)
+                                    .frame(height: 200)
+                                    .overlay(
+                                        Image(systemName: "photo")
+                                            .font(.system(size: 40))
+                                            .foregroundColor(themeObserver.themedPrimaryColor.opacity(0.5))
+                                    )
+                            }
+                            
+                            Button {
+                                showImagePicker = true
+                            } label: {
+                                Image(systemName: "camera.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundColor(.white)
+                                    .frame(width: 36, height: 36)
+                                    .background(themeObserver.themedAccentColor)
+                                    .cornerRadius(8)
+                            }
+                            .padding(8)
+                        }
                         
                         TextFieldWithLabel(
                             title: "Название трека",
@@ -136,6 +171,9 @@ struct AddTrackModal: View {
         ) { result in
             handleFileImport(result)
         }
+        .sheet(isPresented: $showImagePicker) {
+            ImagePicker(selectedImage: $selectedThumbnail)
+        }
     }
 
     private func downloadFromURL() {
@@ -172,26 +210,27 @@ struct AddTrackModal: View {
     private func saveTrack() {
         // Приоритет: локальный файл -> фоновая загрузка
         if let fileURL = selectedFileURL {
-            BackgroundUploadService.shared.enqueueUpload(
-                fileURL: fileURL,
-                title: trackTitle,
-                description: trackArtist.isEmpty ? "Unknown" : trackArtist
-            )
+            BackgroundUploadService.shared.enqueueUpload(fileURL: fileURL)
             ModalProvider.shared.dismiss()
             return
         }
 
-        // Если был получен URL из парсера и он локальный файл — загрузим стримом
         if let mediaURL = downloadedURL, mediaURL.isFileURL {
             isLoading = true
             errorMessage = nil
             Task {
                 do {
-                    let _ = try await UploadService.shared.uploadVideo(
-                        fileURL: mediaURL,
-                        title: trackTitle,
-                        description: trackArtist.isEmpty ? "Unknown" : trackArtist
-                    )
+                    let video = try await UploadService.shared.uploadVideo(fileURL: mediaURL)
+                    
+                    if !trackTitle.isEmpty || !trackArtist.isEmpty || selectedThumbnail != nil {
+                        try await VideoService.shared.updateVideoMetadata(
+                            videoID: video.id,
+                            title: trackTitle.isEmpty ? nil : trackTitle,
+                            description: trackArtist.isEmpty ? nil : trackArtist,
+                            thumbnail: selectedThumbnail
+                        )
+                    }
+                    
                     await MainActor.run {
                         isLoading = false
                         ModalProvider.shared.dismiss()

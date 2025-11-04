@@ -87,6 +87,8 @@ func main() {
                     videosGroup.POST("/upload/raw", videoHandler.UploadVideoRaw)
                     videosGroup.GET("/", videoHandler.GetVideos)
                     videosGroup.GET("/all", videoHandler.SearchAllVideos)
+                    videosGroup.PUT("/:id", videoHandler.UpdateVideoMetadata)
+                    videosGroup.PATCH("/:id", videoHandler.UpdateVideoMetadata)
                     videosGroup.DELETE("/:id", videoHandler.DeleteVideo)
                 }
             }

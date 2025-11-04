@@ -49,8 +49,8 @@ struct SearchVideoView: View {
                     EmptyView()
                 }
             }
-            .frame(height: 120)
-            .cornerRadius(10)
+            .frame(height: 180)
+            .cornerRadius(12)
             .clipped()
 
             // Информация о видео
@@ -140,13 +140,41 @@ struct SearchVideoView: View {
     }
     
     private func playVideo() {
-        // Адаптировать под вашу логику воспроизведения
-        print("Play video: \(video.title)")
+        let track = createTrackFromVideo()
+        queueService.playTrack(track)
     }
     
     private func addToQueue() {
-        // Адаптировать под вашу модель Track
-        print("Add to queue: \(video.title)")
+        let track = createTrackFromVideo()
+        queueService.addToWishlist(track)
+    }
+    
+    private func createTrackFromVideo() -> Track {
+        // Проверяем, есть ли уже такой трек
+        if let existingTrack = TrackController.shared.tracks.first(where: { $0.remoteVideoId == video.id }) {
+            return existingTrack
+        }
+        
+        // Используем proxy endpoint для воспроизведения
+        let baseURL = AppConfig.apiBaseURL
+        let proxyURL = "\(baseURL)/api/videos/\(video.id)/stream/proxy"
+        
+        let track = Track(
+            title: video.title,
+            artist: video.subtitle,
+            duration: video.duration,
+            remoteVideoId: video.id,
+            videoURL: proxyURL,
+            thumbnailURL: video.imageURL,
+            ownerUserId: video.userId
+        )
+        
+        // Сохраняем трек в репозиторий
+        let repository = TrackRepository()
+        repository.saveTrack(track)
+        TrackController.shared.tracks.append(track)
+        
+        return track
     }
     
     private func toggleLike() {

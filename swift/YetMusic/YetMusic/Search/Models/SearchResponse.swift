@@ -4,10 +4,10 @@ enum SearchResultItem: Identifiable {
     case video(VideoResult)
     case author(AuthorResult)
     
-    var id: UUID {
+    var id: String {
         switch self {
-        case .video(let video): return video.id
-        case .author(let author): return author.id
+        case .video(let video): return "video_\(video.id)"
+        case .author(let author): return "author_\(author.id)"
         }
     }
 }
@@ -38,24 +38,82 @@ struct VideosResponse: Codable {
 }
 
 struct AuthorResult: Codable {
-    let id: UUID
+    let id: String
     let title: String
     let subtitle: String
     let imageURL: String?
     let videoCount: Int
     let followerCount: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case id, title, subtitle
+        case imageURL = "imageURL"
+        case videoCount = "videoCount"
+        case followerCount = "followerCount"
+    }
+    
+    // Computed property для совместимости с UUID
+    var uuid: UUID {
+        // Если строка уже валидный UUID, возвращаем его
+        if let uuid = UUID(uuidString: id) {
+            return uuid
+        }
+        // Иначе генерируем детерминированный UUID из строки
+        var uuidString = "00000000-0000-0000-0000-"
+        let numericId = id.replacingOccurrences(of: "[^0-9]", with: "", options: .regularExpression)
+        if let num = Int(numericId) {
+            uuidString += String(format: "%012d", abs(num))
+        } else {
+            // Fallback: используем хеш строки
+            uuidString += String(format: "%012d", abs(id.hashValue))
+        }
+        return UUID(uuidString: uuidString) ?? UUID()
+    }
 }
 
 struct VideoResult: Codable {
-    let id: UUID
+    let id: Int
     let title: String
-    let subtitle: String
-    let imageURL: String?
     let description: String
-    let duration: TimeInterval
-    let viewCount: Int
+    let userId: Int
+    let fileSize: Int64
+    let fileURL: String
+    let thumbnailURL: String?
+    let status: String
     let createdAt: Date
-    let authorId: UUID
+    
+    enum CodingKeys: String, CodingKey {
+        case id, title, description, status
+        case userId = "user_id"
+        case fileSize = "file_size"
+        case fileURL = "file_url"
+        case thumbnailURL = "thumbnail_url"
+        case createdAt = "created_at"
+    }
+    
+    // Computed properties for compatibility with views
+    var subtitle: String {
+        return "Автор #\(userId)"
+    }
+    
+    var imageURL: String? {
+        return thumbnailURL ?? fileURL
+    }
+    
+    var duration: TimeInterval {
+        return 0 // Не доступно с сервера
+    }
+    
+    var viewCount: Int {
+        return 0 // Не доступно с сервера
+    }
+    
+    var authorId: UUID {
+        // Генерируем детерминированный UUID из userId
+        var uuidString = "00000000-0000-0000-0000-"
+        uuidString += String(format: "%012d", abs(userId))
+        return UUID(uuidString: uuidString) ?? UUID()
+    }
 }
 
 enum SearchResult: Codable {

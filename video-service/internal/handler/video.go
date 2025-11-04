@@ -37,7 +37,6 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
         return
     }
 
-    // Получаем файл
     file, header, err := c.Request.FormFile("video")
     if err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": "Video file is required"})
@@ -50,36 +49,24 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
         return
     }
 
-    title := c.PostForm("title")
-    description := c.PostForm("description")
-    
-    if title == "" {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Title is required"})
-        return
-    }
-
-    req := model.CreateVideoRequest{
-        Title:       title,
-        Description: description,
-    }
-
     fileHeader := &model.FileHeader{
         File:     file,
         Filename: header.Filename,
         Size:     header.Size,
     }
 
-    video, err := h.service.CreateVideo(userIDInt, &req, fileHeader)
+    video, err := h.service.CreateVideoFile(userIDInt, fileHeader)
     if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create video"})
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload video"})
         return
     }
 
-    // Generate presigned URL for immediate client use
     ctx := c.Request.Context()
     presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
     if err != nil {
-        presignedURL = ""
+        h.service.DeleteVideo(userIDInt, video.ID)
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate stream URL"})
+        return
     }
 
     c.JSON(http.StatusCreated, gin.H{
@@ -97,8 +84,6 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
     })
 }
 
-// UploadVideoRaw streams a raw request body (e.g., video/mp4) directly to storage.
-// Title and description are taken from query params: ?title=...&description=...
 func (h *VideoHandler) UploadVideoRaw(c *gin.Context) {
     userID, exists := c.Get("userID")
     if !exists {
@@ -111,39 +96,25 @@ func (h *VideoHandler) UploadVideoRaw(c *gin.Context) {
         return
     }
 
-    title := c.Query("title")
-    description := c.Query("description")
-    if title == "" {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Title is required"})
-        return
-    }
-
     contentType := c.GetHeader("Content-Type")
     if contentType == "" {
         contentType = "application/octet-stream"
     }
 
-    // Derive a pseudo filename from content type
-    filename := "upload" + extFromContentType(contentType)
-
-    req := model.CreateVideoRequest{
-        Title:       title,
-        Description: description,
-    }
-
-    video, err := h.service.CreateVideoStream(userIDInt, &req, c.Request.Body, filename, -1, contentType)
+    video, err := h.service.CreateVideoStream(userIDInt, c.Request.Body, "video", -1, contentType)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create video"})
         return
     }
 
-    // Debug log
     c.Writer.Header().Add("X-Uploaded-Video-ID", strconv.Itoa(video.ID))
 
     ctx := c.Request.Context()
     presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
     if err != nil {
-        presignedURL = ""
+        h.service.DeleteVideo(userIDInt, video.ID)
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate stream URL"})
+        return
     }
 
     c.JSON(http.StatusCreated, gin.H{
@@ -169,8 +140,10 @@ func extFromContentType(ct string) string {
         return ".mov"
     case "video/x-matroska":
         return ".mkv"
+    case "video/x-m4v":
+        return ".m4v"
     default:
-        return filepath.Ext(ct) // likely empty; kept for future mapping
+        return ".bin"
     }
 }
 
@@ -182,28 +155,23 @@ func (h *VideoHandler) GetVideos(c *gin.Context) {
     }
     userIDInt := userID.(int)
 
-    // Получаем параметры пагинации
     pageStr := c.DefaultQuery("page", "0")
     limitStr := c.DefaultQuery("limit", "0")
     
     page, _ := strconv.Atoi(pageStr)
     limit, _ := strconv.Atoi(limitStr)
     
-    // Если limit не указан, возвращаем все видео
     videos, err := h.service.GetUserVideosPaginated(userIDInt, page, limit)
     if err != nil {
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get videos"})
         return
     }
 
-    // Debug header to quickly see counts
     c.Writer.Header().Add("X-Videos-Count", strconv.Itoa(len(videos)))
     c.JSON(http.StatusOK, gin.H{"videos": videos})
 }
 
-// SearchAllVideos returns all videos across users with optional server-side filtering and pagination
 func (h *VideoHandler) SearchAllVideos(c *gin.Context) {
-    // Require auth, but results are global
     if _, exists := c.Get("userID"); !exists {
         c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
         return
@@ -228,11 +196,10 @@ func (h *VideoHandler) SearchAllVideos(c *gin.Context) {
 
     videos, err := h.service.GetAllVideosPaginated(q, filterUserID, page, limit)
     if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get videos"})
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search videos"})
         return
     }
 
-    c.Writer.Header().Add("X-Videos-Count", strconv.Itoa(len(videos)))
     c.JSON(http.StatusOK, gin.H{"videos": videos})
 }
 
@@ -259,7 +226,6 @@ func (h *VideoHandler) StreamVideo(c *gin.Context) {
     c.Redirect(http.StatusTemporaryRedirect, presignedURL)
 }
 
-// GetStreamURL returns a JSON with a presigned URL for the video
 func (h *VideoHandler) GetStreamURL(c *gin.Context) {
     videoID, err := strconv.Atoi(c.Param("id"))
     if err != nil {
@@ -283,43 +249,56 @@ func (h *VideoHandler) GetStreamURL(c *gin.Context) {
     c.JSON(http.StatusOK, gin.H{"url": presignedURL})
 }
 
-// StreamVideoProxy streams content through API (supports Range), so clients go via gateway.
 func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
     videoID, err := strconv.Atoi(c.Param("id"))
-    if err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"}); return }
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
+        return
+    }
 
     video, err := h.service.GetVideoPublic(videoID)
-    if err != nil { c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"}); return }
+    if err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
+        return
+    }
 
-    // Stat object
-    size, ctype, err := h.service.StatObject(c.Request.Context(), video.FilePath)
-    if err != nil { c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to stat object"}); return }
-
-    totalSize := size
-    contentType := ctype
-    if contentType == "" { contentType = "application/octet-stream" }
-
-    // Parse Range header
     rangeHeader := c.GetHeader("Range")
-    var start int64 = 0
-    var end int64 = -1
-    status := http.StatusOK
+    var start, end int64 = 0, -1
+
     if rangeHeader != "" {
-        // bytes=start-end
         re := regexp.MustCompile(`bytes=(\d+)-(\d*)`)
-        if m := re.FindStringSubmatch(rangeHeader); len(m) == 3 {
-            if s, err := strconv.ParseInt(m[1], 10, 64); err == nil { start = s }
-            if m[2] != "" { if e, err := strconv.ParseInt(m[2], 10, 64); err == nil { end = e } }
-            if end >= 0 && end >= totalSize { end = totalSize - 1 }
-            status = http.StatusPartialContent
+        matches := re.FindStringSubmatch(rangeHeader)
+        if len(matches) == 3 {
+            start, _ = strconv.ParseInt(matches[1], 10, 64)
+            if matches[2] != "" {
+                end, _ = strconv.ParseInt(matches[2], 10, 64)
+            }
         }
     }
 
-    obj, err := h.service.GetObjectRange(c.Request.Context(), video.FilePath, start, end)
-    if err != nil { c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read object"}); return }
+    ctx := c.Request.Context()
+    totalSize, contentType, err := h.service.StatObject(ctx, video.FilePath)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get video info"})
+        return
+    }
+
+    if end < 0 || end >= totalSize {
+        end = totalSize - 1
+    }
+
+    obj, err := h.service.GetObjectRange(ctx, video.FilePath, start, end)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to stream video"})
+        return
+    }
     defer obj.Close()
 
-    // Headers
+    status := http.StatusOK
+    if rangeHeader != "" {
+        status = http.StatusPartialContent
+    }
+
     c.Header("Accept-Ranges", "bytes")
     c.Header("Content-Type", contentType)
     if status == http.StatusPartialContent {
@@ -338,9 +317,7 @@ func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
         c.Status(http.StatusOK)
     }
 
-    // Stream copy
     if _, err := io.Copy(c.Writer, obj); err != nil {
-        // client aborted or network error; nothing special to do
         return
     }
 }
@@ -357,3 +334,4 @@ func (h *VideoHandler) DeleteVideo(c *gin.Context) {
     }
     c.Status(http.StatusNoContent)
 }
+

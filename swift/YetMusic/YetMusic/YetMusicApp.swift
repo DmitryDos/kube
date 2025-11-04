@@ -43,7 +43,13 @@ struct MainContentView: View {
     @Environment(\.currentPage) private var currentPage
     @StateObject private var orientation = OrientationObserver()
     @EnvironmentObject private var themeObserver: ThemeObserver
+    @ObservedObject private var authService = AuthService.shared
     @State private var scrollOffset: CGFloat = 0
+    
+    init() {
+        // Загружаем популярные видео один раз при запуске приложения
+        SearchService.shared.loadPopularVideos()
+    }
 
     private var pages: [AnyView] {
         var pagesArray: [AnyView] = [
@@ -53,7 +59,7 @@ struct MainContentView: View {
             AnyView(AuthView(authService: AuthService.shared).padding(.horizontal, orientation.isLandscape ? 92 : 0)),
         ]
         
-        if AuthService.shared.isAuthenticated {
+        if authService.isAuthenticated {
             pagesArray.append(
                 AnyView(PlaylistsView().padding(.horizontal, orientation.isLandscape ? 92 : 8).padding(.top, orientation.isLandscape ? 22 : 6))
             )

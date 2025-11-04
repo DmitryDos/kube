@@ -14,6 +14,7 @@ struct Video: Codable, Identifiable {
     let userId: Int
     let fileSize: Int64
     let fileURL: String
+    let thumbnailURL: String?
     let status: String
     let createdAt: Date
     
@@ -22,6 +23,7 @@ struct Video: Codable, Identifiable {
         case userId = "user_id"
         case fileSize = "file_size"
         case fileURL = "file_url"
+        case thumbnailURL = "thumbnail_url"
         case status
         case createdAt = "created_at"
     }
@@ -88,8 +90,80 @@ class VideoService: ObservableObject {
         }
     }
     
+    func updateVideoMetadata(videoID: Int, title: String? = nil, description: String? = nil, thumbnail: UIImage? = nil) async throws {
+        guard let token = getToken() else { throw VideoError.unauthorized }
+        guard let url = URL(string: baseURL + "/api/videos/\(videoID)") else { throw VideoError.invalidURL }
+        
+        if let thumbnail = thumbnail {
+            guard let imageData = thumbnail.jpegData(compressionQuality: 0.8) else {
+                throw VideoError.invalidData
+            }
+            
+            let boundary = UUID().uuidString
+            var request = URLRequest(url: url)
+            request.httpMethod = "PUT"
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            
+            var body = Data()
+            
+            if let title = title {
+                body.append("--\(boundary)\r\n")
+                body.append("Content-Disposition: form-data; name=\"title\"\r\n\r\n")
+                body.append(title)
+                body.append("\r\n")
+            }
+            
+            if let description = description {
+                body.append("--\(boundary)\r\n")
+                body.append("Content-Disposition: form-data; name=\"description\"\r\n\r\n")
+                body.append(description)
+                body.append("\r\n")
+            }
+            
+            body.append("--\(boundary)\r\n")
+            body.append("Content-Disposition: form-data; name=\"thumbnail\"; filename=\"thumbnail.jpg\"\r\n")
+            body.append("Content-Type: image/jpeg\r\n\r\n")
+            body.append(imageData)
+            body.append("\r\n")
+            body.append("--\(boundary)--\r\n")
+            
+            request.httpBody = body
+            
+            let (_, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                throw VideoError.invalidResponse
+            }
+        } else {
+            struct UpdateRequest: Codable {
+                let title: String?
+                let description: String?
+            }
+            
+            let updateRequest = UpdateRequest(title: title, description: description)
+            var request = URLRequest(url: url)
+            request.httpMethod = "PUT"
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONEncoder().encode(updateRequest)
+            
+            let (_, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                throw VideoError.invalidResponse
+            }
+        }
+    }
+    
     private func getToken() -> String? {
         UserDefaults.standard.string(forKey: tokenKey)
+    }
+}
+
+extension Data {
+    mutating func append(_ string: String) {
+        if let data = string.data(using: .utf8) {
+            append(data)
+        }
     }
     
     // MARK: - API Methods

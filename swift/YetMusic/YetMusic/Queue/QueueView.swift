@@ -12,11 +12,10 @@ struct QueueView: View {
     @State private var upcomingTracks: [Track] = []
     @State private var selectedHeader: HeaderSelection = .recent
     @State private var days: [Date] = []
-    @State private var isStackExpanded: Bool = true
-    @State private var isQueueExpanded: Bool = true
 
     private enum HeaderSelection: Equatable {
         case recent
+        case queue
         case day(Date)
     }
 
@@ -28,54 +27,38 @@ struct QueueView: View {
                 GeometryReader { geo in
                     VStack(alignment: .leading, spacing: 10) {
                         if selectedIsRecent() {
-                            let expandedCount = (isStackExpanded ? 1 : 0) + (isQueueExpanded ? 1 : 0)
-                            let sectionHeight: CGFloat = expandedCount > 0 ? max(0, (geo.size.height + 50) / CGFloat(expandedCount)) : 0
-
-                            HStack {
-                                MiniSectionHeader(title: "Вы слушали:", isExpanded: $isStackExpanded)
-                                
-                                Spacer()
-                            }
-
-                            if isStackExpanded {
-                                StackSectionView(
-                                    tracks: stackTracks,
-                                    currentIndex: stackIndex,
-                                    onSelectIndex: { index in
-                                        if index == stackIndex {
-                                            if audioService.trackInfo.isPlaying { audioService.pause() } else { audioService.play() }
-                                        } else {
-                                            queueService.playFromStack(index: index)
-                                        }
-                                        refreshSegments()
+                            // Секция "Недавно" - история воспроизведения
+                            StackSectionView(
+                                tracks: stackTracks,
+                                currentIndex: stackIndex,
+                                onSelectIndex: { index in
+                                    if index == stackIndex {
+                                        if audioService.trackInfo.isPlaying { audioService.pause() } else { audioService.play() }
+                                    } else {
+                                        queueService.playFromStack(index: index)
                                     }
-                                )
-                                .frame(maxHeight: sectionHeight - 75)
-                            }
-
-                            HStack {
-                                MiniSectionHeader(title: "В очереди", isExpanded: $isQueueExpanded)
-                                
-                                Spacer()
-                            }
-
-                            if isQueueExpanded {
-                                QueueSectionView(
-                                    tracks: upcomingTracks,
-                                    onTap: { track in
-                                        queueService.playTrack(track)
-                                    },
-                                    onDelete: { track in
-                                        queueService.removeTrackFromQueues(track)
-                                        refreshSegments()
-                                    },
-                                    onReordered: { newOrder in
-                                        applyUpcomingOrder(newOrder)
-                                    }
-                                )
-                                .frame(maxHeight: sectionHeight - 75)
-                            }
+                                    refreshSegments()
+                                }
+                            )
+                            .frame(maxHeight: geo.size.height)
+                        } else if selectedIsQueue() {
+                            // Секция "Очередь" - wishlist queue
+                            QueueSectionView(
+                                tracks: upcomingTracks,
+                                onTap: { track in
+                                    queueService.playTrack(track)
+                                },
+                                onDelete: { track in
+                                    queueService.removeTrackFromQueues(track)
+                                    refreshSegments()
+                                },
+                                onReordered: { newOrder in
+                                    applyUpcomingOrder(newOrder)
+                                }
+                            )
+                            .frame(maxHeight: geo.size.height)
                         } else {
+                            // История по дням
                             HistorySectionView(items: historyItems) { track in
                                 queueService.playTrack(track)
                             }
@@ -101,6 +84,10 @@ struct QueueView: View {
         HStack(spacing: 8) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
+                    headerChip(title: "Очередь", isSelected: selectedIsQueue()) {
+                        selectedHeader = .queue
+                        refreshSegments()
+                    }
                     headerChip(title: "Недавно", isSelected: selectedIsRecent()) {
                         selectedHeader = .recent
                         refreshSegments()
@@ -136,6 +123,11 @@ struct QueueView: View {
         return false
     }
 
+    private func selectedIsQueue() -> Bool {
+        if case .queue = selectedHeader { return true }
+        return false
+    }
+
     private func selectedIsDay(_ day: Date) -> Bool {
         if case let .day(d) = selectedHeader { return d.startOfDayUTC == day.startOfDayUTC }
         return false
@@ -149,6 +141,8 @@ struct QueueView: View {
     private func refreshSegments() {
         switch selectedHeader {
         case .recent:
+            historyItems = []
+        case .queue:
             historyItems = []
         case let .day(day):
             historyItems = historyService.items(for: day)

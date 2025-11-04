@@ -17,12 +17,13 @@ CREATE TABLE IF NOT EXISTS sessions (
 
 -- Создание таблицы видео
 CREATE TABLE IF NOT EXISTS videos (
-                                      id SERIAL PRIMARY KEY,
-                                      title VARCHAR(255) NOT NULL,
+    id SERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
     description TEXT,
     file_path VARCHAR(500) NOT NULL,
     file_size BIGINT,
     duration INTEGER, -- в секундах
+    thumbnail_path VARCHAR(500), -- путь к обложке в MinIO
     user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
     status VARCHAR(50) DEFAULT 'uploading', -- uploading, processing, ready, failed
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

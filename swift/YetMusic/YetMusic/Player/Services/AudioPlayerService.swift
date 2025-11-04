@@ -92,11 +92,16 @@ class AudioPlayerService: NSObject, ObservableObject {
             player.replaceCurrentItem(with: item)
             observeItem(item)
         } else if let videoID = track.remoteVideoId {
-            // Стримим через API Gateway proxy с JWT заголовком
+            // Стримим через API Gateway proxy
             let base = VideoService.shared.baseURL
             guard let url = URL(string: base + "/api/videos/\(videoID)/stream/proxy") else { return }
-            guard let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) else { return }
-            let headers = ["Authorization": "Bearer \(token)"]
+            
+            // Proxy endpoint публичный, но если есть токен - добавляем его
+            var headers: [String: String] = [:]
+            if let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) {
+                headers["Authorization"] = "Bearer \(token)"
+            }
+            
             let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
             let item = AVPlayerItem(asset: asset)
             player.replaceCurrentItem(with: item)

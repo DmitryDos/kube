@@ -26,14 +26,10 @@ final class BackgroundUploadService: NSObject {
         UserDefaults.standard.string(forKey: tokenKey)
     }
 
-    func enqueueUpload(fileURL: URL, title: String, description: String = "") {
+    func enqueueUpload(fileURL: URL) {
         guard let token = getToken() else { return }
 
-        guard var components = URLComponents(string: baseURL + "/api/videos/upload/raw") else { return }
-        var items = [URLQueryItem(name: "title", value: title)]
-        if !description.isEmpty { items.append(URLQueryItem(name: "description", value: description)) }
-        components.queryItems = items
-        guard let url = components.url else { return }
+        guard let url = URL(string: baseURL + "/api/videos/upload/raw") else { return }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -42,7 +38,7 @@ final class BackgroundUploadService: NSObject {
 
         let task = session.uploadTask(with: request, fromFile: fileURL)
 
-        VideoTransferService.shared.registerUpload(task: task, fileURL: fileURL, title: title)
+        VideoTransferService.shared.registerUpload(task: task, fileURL: fileURL, title: "")
         task.resume()
     }
 

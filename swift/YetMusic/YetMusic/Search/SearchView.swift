@@ -51,45 +51,23 @@ struct SearchView: View {
             }
         }
         .onAppear {
-            if searchService.searchResults.isEmpty {
-                searchService.loadPopularVideos()
-            }
+            // Не загружаем при каждом появлении - только при первом запуске приложения
+            // Инициализация происходит в YetMusicApp
         }
     }
     
     private var searchBar: some View {
-        HStack {
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(themeObserver.themedPrimaryColor)
-                
-                TextField("Поиск видео и авторов", text: $searchText)
-                    .textFieldStyle(PlainTextFieldStyle())
-                    .foregroundColor(themeObserver.themedPrimaryColor)
-                    .onChange(of: searchText) { newValue in
-                        scheduleDebouncedSearch()
-                        if newValue.isEmpty {
-                            searchService.loadPopularVideos()
-                        }
-                    }
-                
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                        searchService.clearResults()
-                        searchService.loadPopularVideos()
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundColor(themeObserver.themedPrimaryColor.opacity(0.6))
-                    }
-                }
+        ExpandableSearchBar(
+            text: $searchText,
+            placeholder: "Поиск видео и авторов",
+            onSubmit: {
+                performSearch()
+            },
+            onClear: {
+                searchService.clearResults()
+                searchService.loadPopularVideos(force: true)
             }
-            .padding(12)
-            .background(themeObserver.contrastColor)
-            .cornerRadius(50)
-        }
-        .padding(.horizontal, 8)
-        .padding(.bottom, 12)
+        )
     }
     
     private var resultsView: some View {
@@ -195,31 +173,34 @@ struct SearchView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
-    private func scheduleDebouncedSearch() {
-        pendingSearch?.cancel()
-        
-        let work = DispatchWorkItem { [searchText] in
-            performSearch(with: searchText)
-        }
-        
-        pendingSearch = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5, execute: work)
-    }
-    
     private func performSearch() {
         performSearch(with: searchText)
     }
     
     private func performSearch(with query: String) {
         guard !query.isEmpty else {
-            searchService.loadPopularVideos()
+            searchService.loadPopularVideos(force: true)
             return
         }
         searchService.search(query: query, filter: selectedFilter)
     }
     
     private func showVideoInfo(_ video: VideoResult) {
-        ModalProvider.shared.show(VideoInfoModal(video: video))
+        // Создаем временный Track для показа в модалке
+        let baseURL = AppConfig.apiBaseURL
+        let proxyURL = "\(baseURL)/api/videos/\(video.id)/stream/proxy"
+        
+        let track = Track(
+            title: video.title,
+            artist: video.subtitle,
+            duration: video.duration,
+            remoteVideoId: video.id,
+            videoURL: proxyURL,
+            thumbnailURL: video.imageURL,
+            ownerUserId: video.userId
+        )
+        
+        ModalProvider.shared.show(ShowTrackInfoModal(track: track, isReadOnly: true))
     }
     
     private func showAuthorInfo(_ author: AuthorResult) {

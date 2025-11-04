@@ -3,6 +3,7 @@ package repository
 import (
     "database/sql"
     "strconv"
+    "strings"
     "video-service/internal/model"
 )
 
@@ -16,8 +17,8 @@ func NewVideoRepository(db *sql.DB) *VideoRepository {
 
 func (r *VideoRepository) Create(video *model.Video) error {
     query := `
-        INSERT INTO videos (title, description, file_path, file_size, user_id, status)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO videos (title, description, file_path, file_size, thumbnail_path, user_id, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING id, created_at, updated_at
     `
 
@@ -27,6 +28,7 @@ func (r *VideoRepository) Create(video *model.Video) error {
         video.Description,
         video.FilePath,
         video.FileSize,
+        video.ThumbnailPath,
         video.UserID,
         video.Status,
     ).Scan(&video.ID, &video.CreatedAt, &video.UpdatedAt)
@@ -38,7 +40,7 @@ func (r *VideoRepository) FindByUserID(userID int) ([]model.Video, error) {
 
 func (r *VideoRepository) FindByUserIDPaginated(userID, page, pageSize int) ([]model.Video, error) {
     query := `
-        SELECT id, title, description, file_path, file_size, user_id, status, created_at, updated_at
+        SELECT id, title, description, file_path, file_size, thumbnail_path, user_id, status, created_at, updated_at
         FROM videos
         WHERE user_id = $1
         ORDER BY created_at DESC
@@ -67,6 +69,7 @@ func (r *VideoRepository) FindByUserIDPaginated(userID, page, pageSize int) ([]m
             &video.Description,
             &video.FilePath,
             &video.FileSize,
+            &video.ThumbnailPath,
             &video.UserID,
             &video.Status,
             &video.CreatedAt,
@@ -83,7 +86,7 @@ func (r *VideoRepository) FindByUserIDPaginated(userID, page, pageSize int) ([]m
 
 func (r *VideoRepository) FindByID(id int) (*model.Video, error) {
     query := `
-        SELECT id, title, description, file_path, file_size, user_id, status, created_at, updated_at
+        SELECT id, title, description, file_path, file_size, thumbnail_path, user_id, status, created_at, updated_at
         FROM videos
         WHERE id = $1
     `
@@ -95,6 +98,7 @@ func (r *VideoRepository) FindByID(id int) (*model.Video, error) {
         &video.Description,
         &video.FilePath,
         &video.FileSize,
+        &video.ThumbnailPath,
         &video.UserID,
         &video.Status,
         &video.CreatedAt,
@@ -113,10 +117,42 @@ func (r *VideoRepository) DeleteByID(id int) error {
     return err
 }
 
+func (r *VideoRepository) UpdateThumbnail(videoID int, thumbnailPath string) error {
+    _, err := r.db.Exec("UPDATE videos SET thumbnail_path = $1 WHERE id = $2", thumbnailPath, videoID)
+    return err
+}
+
+func (r *VideoRepository) UpdateMetadata(videoID int, title *string, description *string) error {
+    updates := []string{}
+    args := []interface{}{}
+    argPos := 1
+
+    if title != nil {
+        updates = append(updates, "title = $"+strconv.Itoa(argPos))
+        args = append(args, *title)
+        argPos++
+    }
+
+    if description != nil {
+        updates = append(updates, "description = $"+strconv.Itoa(argPos))
+        args = append(args, *description)
+        argPos++
+    }
+
+    if len(updates) == 0 {
+        return nil // Нет изменений
+    }
+
+    args = append(args, videoID)
+    query := "UPDATE videos SET " + strings.Join(updates, ", ") + ", updated_at = CURRENT_TIMESTAMP WHERE id = $" + strconv.Itoa(argPos)
+    _, err := r.db.Exec(query, args...)
+    return err
+}
+
 // FindAllPaginatedWithSearch returns videos across all users with optional ILIKE search on title/description
 func (r *VideoRepository) FindAllPaginatedWithSearch(query string, userID *int, page, pageSize int) ([]model.Video, error) {
     base := `
-        SELECT id, title, description, file_path, file_size, user_id, status, created_at, updated_at
+        SELECT id, title, description, file_path, file_size, thumbnail_path, user_id, status, created_at, updated_at
         FROM videos
     `
     where := ""
@@ -166,6 +202,7 @@ func (r *VideoRepository) FindAllPaginatedWithSearch(query string, userID *int, 
             &video.Description,
             &video.FilePath,
             &video.FileSize,
+            &video.ThumbnailPath,
             &video.UserID,
             &video.Status,
             &video.CreatedAt,
