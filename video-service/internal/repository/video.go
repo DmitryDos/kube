@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+	"log"
 	"strconv"
 	"strings"
 	"video-service/internal/model"
@@ -50,7 +51,7 @@ func (r *VideoRepository) FindByUserID(userID uuid.UUID) ([]model.Video, error) 
 
 func (r *VideoRepository) FindByUserIDPaginated(userID uuid.UUID, page, pageSize int) ([]model.Video, error) {
 	query := `
-		SELECT id, title, description, file_path, file_size, thumbnail_path, user_id, status, created_at, updated_at
+		SELECT id, title, description, file_path, file_size, duration, thumbnail_path, user_id, status, created_at, updated_at
 		FROM videos
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -79,6 +80,7 @@ func (r *VideoRepository) FindByUserIDPaginated(userID uuid.UUID, page, pageSize
 			&video.Description,
 			&video.FilePath,
 			&video.FileSize,
+			&video.Duration,
 			&video.ThumbnailPath,
 			&video.UserID,
 			&video.Status,
@@ -96,11 +98,12 @@ func (r *VideoRepository) FindByUserIDPaginated(userID uuid.UUID, page, pageSize
 
 func (r *VideoRepository) FindByID(id uuid.UUID) (*model.Video, error) {
 	query := `
-		SELECT id, title, description, file_path, file_size, thumbnail_path, user_id, status, created_at, updated_at
+		SELECT id, title, description, file_path, file_size, duration, thumbnail_path, user_id, status, created_at, updated_at
 		FROM videos
 		WHERE id = $1
 	`
 
+	log.Printf("[FindByID] Searching for video with UUID: %s", id.String())
 	var video model.Video
 	err := r.db.QueryRow(query, id).Scan(
 		&video.ID,
@@ -108,6 +111,7 @@ func (r *VideoRepository) FindByID(id uuid.UUID) (*model.Video, error) {
 		&video.Description,
 		&video.FilePath,
 		&video.FileSize,
+		&video.Duration,
 		&video.ThumbnailPath,
 		&video.UserID,
 		&video.Status,
@@ -116,9 +120,11 @@ func (r *VideoRepository) FindByID(id uuid.UUID) (*model.Video, error) {
 	)
 
 	if err != nil {
+		log.Printf("[FindByID] Error scanning video: %v, UUID: %s", err, id.String())
 		return nil, err
 	}
 
+	log.Printf("[FindByID] Found video: ID=%s, Title=%s, FilePath=%s", video.ID.String(), video.Title, video.FilePath)
 	return &video, nil
 }
 
@@ -161,7 +167,7 @@ func (r *VideoRepository) UpdateMetadata(videoID uuid.UUID, title *string, descr
 
 func (r *VideoRepository) FindAllPaginatedWithSearch(query string, userID *uuid.UUID, page, pageSize int) ([]model.Video, error) {
 	base := `
-		SELECT id, title, description, file_path, file_size, thumbnail_path, user_id, status, created_at, updated_at
+		SELECT id, title, description, file_path, file_size, duration, thumbnail_path, user_id, status, created_at, updated_at
 		FROM videos
 	`
 	where := ""
@@ -210,6 +216,7 @@ func (r *VideoRepository) FindAllPaginatedWithSearch(query string, userID *uuid.
 			&video.Description,
 			&video.FilePath,
 			&video.FileSize,
+			&video.Duration,
 			&video.ThumbnailPath,
 			&video.UserID,
 			&video.Status,

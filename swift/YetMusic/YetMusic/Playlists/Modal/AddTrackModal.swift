@@ -26,7 +26,7 @@ struct AddTrackModal: View {
                 WideButton(
                     title: "Сохранить трек",
                     action: saveTrack,
-                    isEnabled: !trackTitle.isEmpty && !isLoading
+                    isEnabled: !isLoading
                 )
                 .padding(.horizontal)
             )
@@ -177,44 +177,40 @@ struct AddTrackModal: View {
     }
 
     private func saveTrack() {
-        if let fileURL = selectedFileURL {
-            BackgroundUploadService.shared.enqueueUpload(fileURL: fileURL)
-            ModalProvider.shared.dismiss()
+        guard let fileURL = selectedFileURL else {
+            errorMessage = "Выберите файл для загрузки"
             return
         }
-
-        if let mediaURL = downloadedURL, mediaURL.isFileURL {
-            isLoading = true
-            errorMessage = nil
-            Task {
-                do {
-                    let video = try await UploadService.shared.uploadVideo(fileURL: mediaURL)
-                    
-                    if !trackTitle.isEmpty || !trackArtist.isEmpty || selectedThumbnail != nil {
-                        try await VideoService.shared.updateVideoMetadata(
-                            videoID: video.id,
-                            title: trackTitle.isEmpty ? nil : trackTitle,
-                            description: trackArtist.isEmpty ? nil : trackArtist,
-                            thumbnail: selectedThumbnail
-                        )
-                    }
-                    
-                    await MainActor.run {
-                        isLoading = false
-                        ModalProvider.shared.dismiss()
-                    }
-                } catch {
-                    await MainActor.run {
-                        errorMessage = "Ошибка загрузки видео: \(error.localizedDescription)"
-                        isLoading = false
-                    }
+        
+        isLoading = true
+        errorMessage = nil
+        
+        Task {
+            do {
+                // Загружаем видео
+                let video = try await UploadService.shared.uploadVideo(fileURL: fileURL)
+                
+                // Обновляем метаданные, если они указаны
+                if !trackTitle.isEmpty || !trackArtist.isEmpty || selectedThumbnail != nil {
+                    try await VideoService.shared.updateVideoMetadata(
+                        videoID: video.id,
+                        title: trackTitle.isEmpty ? nil : trackTitle,
+                        description: trackArtist.isEmpty ? nil : trackArtist,
+                        thumbnail: selectedThumbnail
+                    )
+                }
+                
+                await MainActor.run {
+                    isLoading = false
+                    ModalProvider.shared.dismiss()
+                }
+            } catch {
+                await MainActor.run {
+                    errorMessage = "Ошибка загрузки видео: \(error.localizedDescription)"
+                    isLoading = false
                 }
             }
-            return
         }
-
-        // Иначе — сообщаем, что нужен локальный файл для загрузки
-        errorMessage = "Выберите файл для загрузки"
     }
     
     private func handleFileImport(_ result: Result<[URL], Error>) {

@@ -90,9 +90,10 @@ class AudioPlayerService: NSObject, ObservableObject {
             let item = AVPlayerItem(url: local)
             player.replaceCurrentItem(with: item)
             observeItem(item)
-        } else if let videoID = track.videoURL {
+        } else {
+            // Используем track.id для стрима, а не track.videoURL (который содержит presigned URL)
             let base = VideoService.shared.baseURL
-            guard let url = URL(string: base + "/api/videos/\(videoID)/stream/proxy") else { return }
+            guard let url = URL(string: base + "/api/videos/\(track.id.uuidString)/stream/proxy") else { return }
 
             var headers: [String: String] = [:]
             if let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) {
@@ -105,10 +106,6 @@ class AudioPlayerService: NSObject, ObservableObject {
             observeItem(item)
 
             PreloadService.shared.startPreloading(for: track)
-        } else if let direct = track.videoURL, let directURL = URL(string: direct) {
-            let item = AVPlayerItem(url: directURL)
-            player.replaceCurrentItem(with: item)
-            observeItem(item)
         }
         
         trackInfo.track = track

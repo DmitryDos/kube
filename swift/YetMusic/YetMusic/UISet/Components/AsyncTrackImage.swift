@@ -68,12 +68,24 @@ struct AsyncTrackImage: View {
         isLoading = true
         
         // Если есть thumbnail URL от сервера - загружаем его
-        if let thumbnailURLString = track.thumbnailURL {
+        if let thumbnailURLString = track.thumbnailURL, !thumbnailURLString.isEmpty {
             var fullURLString = thumbnailURLString
             
-            // Если URL относительный, добавляем baseURL
+            // Если URL относительный (начинается с /), добавляем baseURL
             if thumbnailURLString.hasPrefix("/") {
                 fullURLString = VideoService.shared.baseURL + thumbnailURLString
+            } 
+            // Если это UUID без префикса, строим путь к thumbnail endpoint
+            else if UUID(uuidString: thumbnailURLString) != nil {
+                fullURLString = VideoService.shared.baseURL + "/api/videos/\(thumbnailURLString)/thumbnail"
+            }
+            // Если это полный URL (http:// или https://), используем как есть
+            else if thumbnailURLString.hasPrefix("http://") || thumbnailURLString.hasPrefix("https://") {
+                // Используем как есть
+            }
+            // Иначе считаем относительным путем
+            else {
+                fullURLString = VideoService.shared.baseURL + "/" + thumbnailURLString
             }
             
             if let thumbnailURL = URL(string: fullURLString) {
@@ -90,7 +102,14 @@ struct AsyncTrackImage: View {
     
     private func loadRemoteThumbnail(from url: URL) {
         print("[AsyncTrackImage] Loading thumbnail from: \(url.absoluteString)")
-        downloadTask = URLSession.shared.dataTask(with: url) { data, response, error in
+        
+        var request = URLRequest(url: url)
+        // Добавляем токен авторизации, если есть
+        if let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        downloadTask = URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 self.isLoading = false
                 
@@ -102,8 +121,14 @@ struct AsyncTrackImage: View {
                 if let httpResponse = response as? HTTPURLResponse {
                     print("[AsyncTrackImage] Thumbnail response status: \(httpResponse.statusCode)")
                     print("[AsyncTrackImage] Content-Type: \(httpResponse.value(forHTTPHeaderField: "Content-Type") ?? "unknown")")
+                    print("[AsyncTrackImage] URL: \(url.absoluteString)")
+                    
                     if httpResponse.statusCode != 200 {
-                        print("[AsyncTrackImage] Non-200 status code")
+                        // Если это JSON ошибка, логируем её
+                        if let data = data, let errorString = String(data: data, encoding: .utf8) {
+                            print("[AsyncTrackImage] Error response: \(errorString.prefix(500))")
+                        }
+                        print("[AsyncTrackImage] Non-200 status code, skipping thumbnail")
                         return
                     }
                 }

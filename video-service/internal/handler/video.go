@@ -251,17 +251,23 @@ func (h *VideoHandler) GetStreamURL(c *gin.Context) {
 }
 
 func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
-	videoID, err := uuid.Parse(c.Param("id"))
+	idParam := c.Param("id")
+	log.Printf("[StreamVideoProxy] Received ID param: %s", idParam)
+	videoID, err := uuid.Parse(idParam)
 	if err != nil {
+		log.Printf("[StreamVideoProxy] Failed to parse UUID: %v, param: %s", err, idParam)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
 		return
 	}
 
+	log.Printf("[StreamVideoProxy] Parsed UUID: %s", videoID.String())
 	video, err := h.service.GetVideoPublic(videoID)
 	if err != nil {
+		log.Printf("[StreamVideoProxy] Video not found: %v, UUID: %s", err, videoID.String())
 		c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
 		return
 	}
+	log.Printf("[StreamVideoProxy] Found video: %s, file_path: %s", video.ID.String(), video.FilePath)
 
 	rangeHeader := c.GetHeader("Range")
 	var start, end int64 = 0, -1
@@ -324,17 +330,23 @@ func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
 }
 
 func (h *VideoHandler) GetThumbnail(c *gin.Context) {
-	videoID, err := uuid.Parse(c.Param("id"))
+	idParam := c.Param("id")
+	log.Printf("[GetThumbnail] Received ID param: %s", idParam)
+	videoID, err := uuid.Parse(idParam)
 	if err != nil {
+		log.Printf("[GetThumbnail] Failed to parse UUID: %v, param: %s", err, idParam)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
 		return
 	}
 
+	log.Printf("[GetThumbnail] Parsed UUID: %s", videoID.String())
 	video, err := h.service.GetVideoPublic(videoID)
 	if err != nil {
+		log.Printf("[GetThumbnail] Video not found: %v, UUID: %s", err, videoID.String())
 		c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
 		return
 	}
+	log.Printf("[GetThumbnail] Found video: %s, thumbnail_path: %v", video.ID.String(), video.ThumbnailPath)
 
 	if !video.ThumbnailPath.Valid || video.ThumbnailPath.String == "" {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Thumbnail not found"})
