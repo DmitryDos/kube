@@ -237,12 +237,6 @@ func (h *VideoHandler) SearchAllVideos(c *gin.Context) {
 }
 
 func (h *VideoHandler) StreamVideo(c *gin.Context) {
-    _, exists := c.Get("userID")
-    if !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
-        return
-    }
-
     videoID, err := strconv.Atoi(c.Param("id"))
     if err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
@@ -267,12 +261,6 @@ func (h *VideoHandler) StreamVideo(c *gin.Context) {
 
 // GetStreamURL returns a JSON with a presigned URL for the video
 func (h *VideoHandler) GetStreamURL(c *gin.Context) {
-    _, exists := c.Get("userID")
-    if !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
-        return
-    }
-
     videoID, err := strconv.Atoi(c.Param("id"))
     if err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
@@ -297,9 +285,6 @@ func (h *VideoHandler) GetStreamURL(c *gin.Context) {
 
 // StreamVideoProxy streams content through API (supports Range), so clients go via gateway.
 func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
-    _, exists := c.Get("userID")
-    if !exists { c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"}); return }
-
     videoID, err := strconv.Atoi(c.Param("id"))
     if err != nil { c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"}); return }
 
