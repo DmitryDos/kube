@@ -96,6 +96,11 @@ func (s *VideoService) GetUserVideosPaginated(userID uuid.UUID, page, pageSize i
             thumbnailURL = fmt.Sprintf("/api/videos/%s/thumbnail", video.ID.String())
         }
 
+        var duration float64
+        if video.Duration.Valid {
+            duration = video.Duration.Float64
+        }
+        
         response = append(response, model.VideoResponse{
             ID:           video.ID,
             Title:        video.Title,
@@ -105,7 +110,7 @@ func (s *VideoService) GetUserVideosPaginated(userID uuid.UUID, page, pageSize i
             FileURL:      fileURL,
             ThumbnailURL: thumbnailURL,
             Status:       video.Status,
-            Duration:     video.Duration,
+            Duration:     duration,
             CreatedAt:    video.CreatedAt,
         })
     }
@@ -133,6 +138,11 @@ func (s *VideoService) GetAllVideosPaginated(query string, userID *uuid.UUID, pa
             thumbnailURL = fmt.Sprintf("/api/videos/%s/thumbnail", video.ID.String())
         }
 
+        var duration float64
+        if video.Duration.Valid {
+            duration = video.Duration.Float64
+        }
+        
         response = append(response, model.VideoResponse{
             ID:           video.ID,
             Title:        video.Title,
@@ -142,7 +152,7 @@ func (s *VideoService) GetAllVideosPaginated(query string, userID *uuid.UUID, pa
             FileURL:      fileURL,
             ThumbnailURL: thumbnailURL,
             Status:       video.Status,
-            Duration:     video.Duration,
+            Duration:     duration,
             CreatedAt:    video.CreatedAt,
         })
     }

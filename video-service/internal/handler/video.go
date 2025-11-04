@@ -76,6 +76,11 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
 		thumbnailURL = fmt.Sprintf("/api/videos/%s/thumbnail", video.ID.String())
 	}
 
+	var duration float64
+	if video.Duration.Valid {
+		duration = video.Duration.Float64
+	}
+
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Video uploaded successfully",
 		"video": model.VideoResponse{
@@ -87,7 +92,7 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
 			FileURL:      presignedURL,
 			ThumbnailURL: thumbnailURL,
 			Status:       video.Status,
-			Duration:     video.Duration,
+			Duration:     duration,
 			CreatedAt:    video.CreatedAt,
 		},
 	})
@@ -131,6 +136,11 @@ func (h *VideoHandler) UploadVideoRaw(c *gin.Context) {
 		thumbnailURL = fmt.Sprintf("/api/videos/%s/thumbnail", video.ID.String())
 	}
 
+	var duration float64
+	if video.Duration.Valid {
+		duration = video.Duration.Float64
+	}
+
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Video uploaded successfully",
 		"video": model.VideoResponse{
@@ -142,7 +152,7 @@ func (h *VideoHandler) UploadVideoRaw(c *gin.Context) {
 			FileURL:      presignedURL,
 			ThumbnailURL: thumbnailURL,
 			Status:       video.Status,
-			Duration:     video.Duration,
+			Duration:     duration,
 			CreatedAt:    video.CreatedAt,
 		},
 	})

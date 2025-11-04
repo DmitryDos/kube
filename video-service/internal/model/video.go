@@ -13,7 +13,7 @@ type Video struct {
 	Description  string         `json:"description" db:"description"`
 	FilePath     string         `json:"file_path" db:"file_path"`
 	FileSize     int64          `json:"file_size" db:"file_size"`
-	Duration     float64        `json:"duration" db:"duration"`
+	Duration     sql.NullFloat64 `json:"duration" db:"duration"`
 	ThumbnailPath sql.NullString `json:"thumbnail_path" db:"thumbnail_path"`
 	UserID       uuid.UUID      `json:"user_id" db:"user_id"`
 	Status       string         `json:"status" db:"status"`

@@ -11,6 +11,14 @@ struct User: Codable, Identifiable {
     let id: UUID
     let email: String
     let name: String
+    let createdAt: Date?
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case email
+        case name
+        case createdAt = "created_at"
+    }
     
     var initials: String {
         name.prefix(1).uppercased()

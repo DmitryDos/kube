@@ -86,6 +86,11 @@ func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
             thumbnailURL = fmt.Sprintf("/api/videos/%s/thumbnail", videoID.String())
         }
 
+        var duration float64
+        if video.Duration.Valid {
+            duration = video.Duration.Float64
+        }
+
         c.JSON(http.StatusOK, gin.H{
             "message": "Video metadata updated successfully",
             "video": model.VideoResponse{
@@ -97,7 +102,7 @@ func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
                 FileURL:      fileURL,
                 ThumbnailURL: thumbnailURL,
                 Status:       video.Status,
-                Duration:     video.Duration,
+                Duration:     duration,
                 CreatedAt:    video.CreatedAt,
             },
         })
@@ -127,6 +132,11 @@ func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
         thumbnailURL = fmt.Sprintf("/api/videos/%s/thumbnail", videoID.String())
     }
 
+    var duration float64
+    if video.Duration.Valid {
+        duration = video.Duration.Float64
+    }
+
     c.JSON(http.StatusOK, gin.H{
         "message": "Video metadata updated successfully",
         "video": model.VideoResponse{
@@ -138,7 +148,7 @@ func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
             FileURL:      fileURL,
             ThumbnailURL: thumbnailURL,
             Status:       video.Status,
-            Duration:     video.Duration,
+            Duration:     duration,
             CreatedAt:    video.CreatedAt,
         },
     })
