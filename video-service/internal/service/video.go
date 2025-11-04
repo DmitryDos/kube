@@ -95,7 +95,7 @@ func (s *VideoService) GetUserVideosPaginated(userID, page, pageSize int) ([]mod
 
         var thumbnailURL string
         if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
-            thumbnailURL, _ = s.storage.GeneratePresignedURL(ctx, video.ThumbnailPath.String)
+            thumbnailURL = fmt.Sprintf("/api/videos/%d/thumbnail", video.ID)
         }
 
         response = append(response, model.VideoResponse{
@@ -132,7 +132,7 @@ func (s *VideoService) GetAllVideosPaginated(query string, userID *int, page, pa
 
         var thumbnailURL string
         if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
-            thumbnailURL, _ = s.storage.GeneratePresignedURL(ctx, video.ThumbnailPath.String)
+            thumbnailURL = fmt.Sprintf("/api/videos/%d/thumbnail", video.ID)
         }
 
         response = append(response, model.VideoResponse{

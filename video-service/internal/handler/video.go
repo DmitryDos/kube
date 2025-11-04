@@ -321,6 +321,45 @@ func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
     }
 }
 
+func (h *VideoHandler) GetThumbnail(c *gin.Context) {
+    videoID, err := strconv.Atoi(c.Param("id"))
+    if err != nil {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
+        return
+    }
+
+    video, err := h.service.GetVideoPublic(videoID)
+    if err != nil {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
+        return
+    }
+
+    if !video.ThumbnailPath.Valid || video.ThumbnailPath.String == "" {
+        c.JSON(http.StatusNotFound, gin.H{"error": "Thumbnail not found"})
+        return
+    }
+
+    ctx := c.Request.Context()
+    _, contentType, err := h.service.StatObject(ctx, video.ThumbnailPath.String)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get thumbnail info"})
+        return
+    }
+
+    obj, err := h.service.GetObjectRange(ctx, video.ThumbnailPath.String, 0, -1)
+    if err != nil {
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get thumbnail"})
+        return
+    }
+    defer obj.Close()
+
+    c.Header("Content-Type", contentType)
+    c.Header("Cache-Control", "public, max-age=3600")
+    if _, err := io.Copy(c.Writer, obj); err != nil {
+        return
+    }
+}
+
 func (h *VideoHandler) DeleteVideo(c *gin.Context) {
     userID, exists := c.Get("userID")
     if !exists { c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"}); return }

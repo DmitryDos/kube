@@ -153,12 +153,20 @@ struct ShowTrackInfoModal: View {
         if let videoID = track.remoteVideoId {
             Task {
                 do {
-                    try await VideoService.shared.updateVideoMetadata(
+                    if let updatedVideo = try await VideoService.shared.updateVideoMetadata(
                         videoID: videoID,
                         title: editedTitle,
                         description: editedArtist,
                         thumbnail: selectedThumbnail
-                    )
+                    ) {
+                        // Обновляем трек с новым thumbnailURL
+                        await MainActor.run {
+                            if let index = TrackController.shared.tracks.firstIndex(where: { $0.id == track.id }) {
+                                TrackController.shared.tracks[index].thumbnailURL = updatedVideo.thumbnailURL
+                                TrackRepository().updateTrackMetadata(track: TrackController.shared.tracks[index])
+                            }
+                        }
+                    }
                 } catch {
                     print("Failed to update video metadata: \(error)")
                 }

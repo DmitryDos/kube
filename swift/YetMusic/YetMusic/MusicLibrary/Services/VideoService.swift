@@ -91,7 +91,12 @@ class VideoService: ObservableObject {
         }
     }
     
-    func updateVideoMetadata(videoID: Int, title: String? = nil, description: String? = nil, thumbnail: UIImage? = nil) async throws {
+    struct UpdateVideoResponse: Codable {
+        let message: String
+        let video: Video?
+    }
+    
+    func updateVideoMetadata(videoID: Int, title: String? = nil, description: String? = nil, thumbnail: UIImage? = nil) async throws -> Video? {
         guard let token = getToken() else { throw VideoError.unauthorized }
         guard let url = URL(string: baseURL + "/api/videos/\(videoID)") else { throw VideoError.invalidURL }
         
@@ -131,10 +136,15 @@ class VideoService: ObservableObject {
             
             request.httpBody = body
             
-            let (_, response) = try await session.data(for: request)
+            let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
                 throw VideoError.invalidResponse
             }
+            
+            if let updateResponse = try? makeDecoder().decode(UpdateVideoResponse.self, from: data) {
+                return updateResponse.video
+            }
+            return nil
         } else {
             struct UpdateRequest: Codable {
                 let title: String?
@@ -148,10 +158,15 @@ class VideoService: ObservableObject {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONEncoder().encode(updateRequest)
             
-            let (_, response) = try await session.data(for: request)
+            let (data, response) = try await session.data(for: request)
             guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
                 throw VideoError.invalidResponse
             }
+            
+            if let updateResponse = try? makeDecoder().decode(UpdateVideoResponse.self, from: data) {
+                return updateResponse.video
+            }
+            return nil
         }
     }
     

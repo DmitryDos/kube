@@ -1,6 +1,7 @@
 package handler
 
 import (
+    "fmt"
     "net/http"
     "strconv"
     "video-service/internal/model"
@@ -61,10 +62,10 @@ func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
                 Size:     thumbnailFileHeader.Size,
             }
 
-            if err := h.service.UpdateVideoThumbnail(userIDInt, videoID, fileHeader); err != nil {
-                c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update thumbnail"})
-                return
-            }
+                if err := h.service.UpdateVideoThumbnail(userIDInt, videoID, fileHeader); err != nil {
+                    c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update thumbnail"})
+                    return
+                }
         }
 
         if req.Title != nil || req.Description != nil {
@@ -74,7 +75,34 @@ func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
             }
         }
 
-        c.JSON(http.StatusOK, gin.H{"message": "Video metadata updated successfully"})
+        // Получаем обновленное видео для ответа
+        video, err := h.service.GetVideo(userIDInt, videoID)
+        if err != nil {
+            c.JSON(http.StatusOK, gin.H{"message": "Video metadata updated successfully"})
+            return
+        }
+
+        ctx := c.Request.Context()
+        fileURL, _ := h.service.GetVideoStreamURL(ctx, video.FilePath)
+        var thumbnailURL string
+        if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
+            thumbnailURL = fmt.Sprintf("/api/videos/%d/thumbnail", videoID)
+        }
+
+        c.JSON(http.StatusOK, gin.H{
+            "message": "Video metadata updated successfully",
+            "video": model.VideoResponse{
+                ID:           video.ID,
+                Title:        video.Title,
+                Description:  video.Description,
+                UserID:       video.UserID,
+                FileSize:     video.FileSize,
+                FileURL:      fileURL,
+                ThumbnailURL: thumbnailURL,
+                Status:       video.Status,
+                CreatedAt:    video.CreatedAt,
+            },
+        })
         return
     }
 
@@ -88,5 +116,32 @@ func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
         return
     }
 
-    c.JSON(http.StatusOK, gin.H{"message": "Video metadata updated successfully"})
+    // Получаем обновленное видео для ответа
+    video, err := h.service.GetVideo(userIDInt, videoID)
+    if err != nil {
+        c.JSON(http.StatusOK, gin.H{"message": "Video metadata updated successfully"})
+        return
+    }
+
+    ctx := c.Request.Context()
+    fileURL, _ := h.service.GetVideoStreamURL(ctx, video.FilePath)
+    var thumbnailURL string
+    if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
+        thumbnailURL, _ = h.service.GetVideoStreamURL(ctx, video.ThumbnailPath.String)
+    }
+
+    c.JSON(http.StatusOK, gin.H{
+        "message": "Video metadata updated successfully",
+        "video": model.VideoResponse{
+            ID:           video.ID,
+            Title:        video.Title,
+            Description:  video.Description,
+            UserID:       video.UserID,
+            FileSize:     video.FileSize,
+            FileURL:      fileURL,
+            ThumbnailURL: thumbnailURL,
+            Status:       video.Status,
+            CreatedAt:    video.CreatedAt,
+        },
+    })
 }

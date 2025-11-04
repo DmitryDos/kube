@@ -36,7 +36,7 @@ class TrackController: ObservableObject {
                         duration: 0,
                         remoteVideoId: remoteVideo.id,
                         videoURL: remoteVideo.fileURL,
-                        thumbnailURL: nil,
+                        thumbnailURL: remoteVideo.thumbnailURL,
                         ownerUserId: remoteVideo.userId
                     )
                 }
@@ -108,7 +108,7 @@ class TrackController: ObservableObject {
                         duration: 0,
                         remoteVideoId: remoteVideo.id,
                         videoURL: remoteVideo.fileURL,
-                        thumbnailURL: nil,
+                        thumbnailURL: remoteVideo.thumbnailURL,
                         ownerUserId: remoteVideo.userId
                     )
                     if let existing = existing {

@@ -96,13 +96,36 @@ struct AsyncTrackImage: View {
     }
     
     private func loadRemoteThumbnail(from url: URL) {
+        print("[AsyncTrackImage] Loading thumbnail from: \(url.absoluteString)")
         downloadTask = URLSession.shared.dataTask(with: url) { data, response, error in
             DispatchQueue.main.async {
                 self.isLoading = false
                 
+                if let error = error {
+                    print("[AsyncTrackImage] Error loading thumbnail: \(error.localizedDescription)")
+                    // Если не удалось загрузить thumbnail, пробуем сгенерировать из видео
+                    if let videoURL = self.track.playableURL {
+                        self.generateThumbnail(from: videoURL)
+                    }
+                    return
+                }
+                
+                if let httpResponse = response as? HTTPURLResponse {
+                    print("[AsyncTrackImage] Thumbnail response status: \(httpResponse.statusCode)")
+                    if httpResponse.statusCode != 200 {
+                        print("[AsyncTrackImage] Non-200 status code, falling back to video thumbnail")
+                        if let videoURL = self.track.playableURL {
+                            self.generateThumbnail(from: videoURL)
+                        }
+                        return
+                    }
+                }
+                
                 if let data = data, let image = UIImage(data: data) {
+                    print("[AsyncTrackImage] Successfully loaded thumbnail, size: \(data.count) bytes")
                     self.image = image
                 } else {
+                    print("[AsyncTrackImage] Failed to create image from data")
                     // Если не удалось загрузить thumbnail, пробуем сгенерировать из видео
                     if let videoURL = self.track.playableURL {
                         self.generateThumbnail(from: videoURL)

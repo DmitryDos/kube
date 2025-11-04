@@ -89,6 +89,7 @@ func main() {
         api.GET("/videos/:id/stream", videoHandler.StreamVideo)
         api.GET("/videos/:id/stream/url", videoHandler.GetStreamURL)
         api.GET("/videos/:id/stream/proxy", videoHandler.StreamVideoProxy)
+        api.GET("/videos/:id/thumbnail", videoHandler.GetThumbnail)
     }
 
     port := ":3001"
