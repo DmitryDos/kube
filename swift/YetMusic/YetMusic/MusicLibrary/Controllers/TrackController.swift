@@ -131,31 +131,47 @@ class TrackController: ObservableObject {
         loadFirstPage(query: query)
     }
     
-    // Загрузка видео на сервер
     func uploadVideo(_ videoData: Data, title: String, artist: String) async throws -> Track {
-        let video = try await videoService.uploadVideo(
-            videoData: videoData,
-            title: title,
-            description: artist // используем artist как description
-        )
+        let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".mp4")
         
-        let track = Track(
-            title: video.title,
-            artist: artist,
-            duration: 0, // TODO: получать длительность из метаданных
-            remoteVideoId: video.id,
-            videoURL: video.fileURL,
-            thumbnailURL: nil,
-            ownerUserId: video.userId
-        )
-        
-        await MainActor.run {
-            tracks.append(track)
-            repository.saveTrack(track)
-            objectWillChange.send()
+        do {
+            try videoData.write(to: tempURL)
+            defer {
+                try? FileManager.default.removeItem(at: tempURL)
+            }
+            
+            let video = try await UploadService.shared.uploadVideo(fileURL: tempURL)
+            
+            if !title.isEmpty || !artist.isEmpty {
+                try await VideoService.shared.updateVideoMetadata(
+                    videoID: video.id,
+                    title: title.isEmpty ? nil : title,
+                    description: artist.isEmpty ? nil : artist,
+                    thumbnail: nil
+                )
+            }
+            
+            let track = Track(
+                title: title.isEmpty ? video.title : title,
+                artist: artist.isEmpty ? video.description : artist,
+                duration: 0,
+                remoteVideoId: video.id,
+                videoURL: video.fileURL,
+                thumbnailURL: video.thumbnailURL,
+                ownerUserId: video.userId
+            )
+            
+            await MainActor.run {
+                tracks.append(track)
+                repository.saveTrack(track)
+                objectWillChange.send()
+            }
+            
+            return track
+        } catch {
+            try? FileManager.default.removeItem(at: tempURL)
+            throw error
         }
-        
-        return track
     }
     
     func deleteTrack(_ track: Track) throws {

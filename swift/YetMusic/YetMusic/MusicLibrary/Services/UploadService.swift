@@ -44,15 +44,15 @@ final class UploadService {
         request.timeoutInterval = 600
 
         var body = Data()
-        body.append("--\(boundary)\r\n")
-        body.append("Content-Disposition: form-data; name=\"video\"; filename=\"\(fileURL.lastPathComponent)\"\r\n")
-        body.append("Content-Type: video/mp4\r\n\r\n")
-        
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"video\"; filename=\"\(fileURL.lastPathComponent)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: video/mp4\r\n\r\n".data(using: .utf8)!)
+
         let videoData = try Data(contentsOf: fileURL)
         body.append(videoData)
-        body.append("\r\n")
-        body.append("--\(boundary)--\r\n")
-        
+        body.append("\r\n".data(using: .utf8)!)
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+
         request.httpBody = body
 
         let (data, response) = try await session.data(for: request)
@@ -87,12 +87,3 @@ private func makeDecoder() -> JSONDecoder {
     }
     return decoder
 }
-
-extension Data {
-    mutating func append(_ string: String) {
-        if let data = string.data(using: .utf8) {
-            append(data)
-        }
-    }
-}
-

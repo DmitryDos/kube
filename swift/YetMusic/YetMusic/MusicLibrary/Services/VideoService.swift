@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import UIKit
 
 struct Video: Codable, Identifiable {
     let id: Int
@@ -157,70 +158,6 @@ class VideoService: ObservableObject {
     private func getToken() -> String? {
         UserDefaults.standard.string(forKey: tokenKey)
     }
-}
-
-extension Data {
-    mutating func append(_ string: String) {
-        if let data = string.data(using: .utf8) {
-            append(data)
-        }
-    }
-    
-    // MARK: - API Methods
-    
-    func uploadVideo(videoData: Data, title: String, description: String = "") async throws -> Video {
-        guard let token = getToken() else {
-            throw VideoError.unauthorized
-        }
-        
-        let boundary = UUID().uuidString
-        var request = URLRequest(url: URL(string: "\(baseURL)/api/videos/upload")!)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 300
-        
-        let httpBody = createMultipartBody(
-            videoData: videoData,
-            title: title,
-            description: description,
-            boundary: boundary
-        )
-        request.httpBody = httpBody
-        
-        let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw VideoError.invalidResponse
-        }
-        
-        guard (200...299).contains(httpResponse.statusCode) else {
-            if let errorData = String(data: data, encoding: .utf8) {
-                print("Server error response: \(errorData)")
-            }
-            throw VideoError.serverError(statusCode: httpResponse.statusCode)
-        }
-        
-        let decoder = makeDecoder()
-        
-        struct UploadResponse: Codable {
-            let message: String
-            let video: Video
-        }
-        
-        let uploadResponse = try decoder.decode(UploadResponse.self, from: data)
-        
-        await MainActor.run {
-            videos.append(uploadResponse.video)
-        }
-        
-        return uploadResponse.video
-    }
-
-    // Streaming upload from a local file URL using URLSession.uploadTask
-    func uploadVideo(fileURL: URL, title: String, description: String = "") async throws -> Video {
-        return try await UploadService.shared.uploadVideo(fileURL: fileURL, title: title, description: description)
-    }
     
     func loadVideos(page: Int = 0, pageSize: Int = 20, query: String? = nil, userId: Int? = nil, mine: Bool = false, completion: @escaping ([Video]) -> Void) {
         guard let token = getToken() else {
@@ -254,8 +191,6 @@ extension Data {
             }
         }
     }
-    
-    // MARK: - Network Helper
     
     private func makeRequest<T: Decodable>(
         endpoint: String,
@@ -323,33 +258,13 @@ extension Data {
             }
         }.resume()
     }
-    
-    private func createMultipartBody(videoData: Data, title: String, description: String, boundary: String) -> Data {
-        var body = Data()
-        
-        // Добавляем title
-        body.append("--\(boundary)\r\n")
-        body.append("Content-Disposition: form-data; name=\"title\"\r\n\r\n")
-        body.append("\(title)\r\n")
-        
-        // Добавляем description
-        if !description.isEmpty {
-            body.append("--\(boundary)\r\n")
-            body.append("Content-Disposition: form-data; name=\"description\"\r\n\r\n")
-            body.append("\(description)\r\n")
+}
+
+extension Data {
+    mutating func append(_ string: String) {
+        if let data = string.data(using: .utf8) {
+            append(data)
         }
-        
-        // Добавляем видео файл
-        body.append("--\(boundary)\r\n")
-        body.append("Content-Disposition: form-data; name=\"video\"; filename=\"video.mp4\"\r\n")
-        body.append("Content-Type: video/mp4\r\n\r\n")
-        body.append(videoData)
-        body.append("\r\n")
-        
-        // Завершаем boundary
-        body.append("--\(boundary)--\r\n")
-        
-        return body
     }
 }
 
@@ -392,15 +307,6 @@ enum VideoError: LocalizedError {
             return "Неверный URL"
         case .noData:
             return "Нет данных"
-        }
-    }
-}
-
-// MARK: - Data Extensions
-extension Data {
-    mutating func append(_ string: String) {
-        if let data = string.data(using: .utf8) {
-            append(data)
         }
     }
 }
