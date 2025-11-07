@@ -12,8 +12,15 @@
 
 import SwiftUI
 
-extension Notification.Name {
-    static let currentPageChanged = Notification.Name("currentPageChanged")
+struct CurrentPageKey: EnvironmentKey {
+    static let defaultValue: Binding<Int> = .constant(0)
+}
+
+extension EnvironmentValues {
+    var currentPage: Binding<Int> {
+        get { self[CurrentPageKey.self] }
+        set { self[CurrentPageKey.self] = newValue }
+    }
 }
 
 @main
@@ -23,63 +30,45 @@ struct MusicApp: App {
 
     var body: some Scene {
         WindowGroup {
-            MainContentView(current: $currentPage)
+            MainContentView()
                 .overlay(GlobalPlayerOverlay(currentPage: $currentPage))
-                .overlay(GlobalAuthOverlay())
                 .environmentObject(AuthService.shared)
                 .environmentObject(ThemeObserver.shared)
+                .environment(\.currentPage, $currentPage)
         }
     }
 }
 
 struct MainContentView: View {
-    @Binding var current: Int
-    
+    @Environment(\.currentPage) private var currentPage
     @StateObject private var orientation = OrientationObserver()
     @EnvironmentObject private var themeObserver: ThemeObserver
+    @ObservedObject private var authService = AuthService.shared
     @State private var scrollOffset: CGFloat = 0
-    @State private var isMenuExpanded = false
     
+    init() {
+        // Загружаем популярные видео один раз при запуске приложения
+        SearchService.shared.loadPopularVideos()
+    }
+
     private var pages: [AnyView] {
-        [
+        var pagesArray: [AnyView] = [
             AnyView(FullPlayerView().statusBar(hidden: orientation.isLandscape)),
-            AnyView(QueueView()),
-            AnyView(PlaylistsView()),
-            AnyView(AuthView(authService: AuthService.shared))
+            AnyView(QueueView().padding(.horizontal, orientation.isLandscape ? 92 : 16).padding(.top, orientation.isLandscape ? 24 : 6)),
+            AnyView(SearchView().padding(.horizontal, orientation.isLandscape ? 92 : 8).padding(.top, orientation.isLandscape ? 22 : 6)),
+            AnyView(AuthView(authService: AuthService.shared).padding(.horizontal, orientation.isLandscape ? 92 : 0)),
         ]
+        
+        if authService.isAuthenticated {
+            pagesArray.append(
+                AnyView(PlaylistsView().padding(.horizontal, orientation.isLandscape ? 92 : 8).padding(.top, orientation.isLandscape ? 22 : 6))
+            )
+        }
+        
+        return pagesArray
     }
     
-    private var menuButtons: [ActionButton] {
-        [
-            ActionButton(
-                title: "Тема",
-                icon: themeObserver.isDarkTheme ? "sun.max.fill" : "moon.fill",
-                color: .orange
-            ) {
-                withAnimation {
-                    themeObserver.toggleTheme()
-                }
-            },
-            
-            ActionButton(
-                title: "Профиль",
-                icon: "person.crop.circle",
-                color: .blue
-            ) {
-                current = 3
-            },
-            
-            ActionButton(
-                title: "Добавить треки",
-                icon: "arrow.down.circle.fill",
-                color: .yellow
-            ) {
-                ModalProvider.shared.show(AddTrackModal())
-            },
-        ]
-    }
-    
-    @State private var pageOffsets: [CGFloat] = Array(repeating: 0, count: 4)
+    @State private var pageOffsets: [CGFloat] = Array(repeating: 0, count: 5)
     
     var body: some View {
         GeometryReader { geo in
@@ -87,7 +76,7 @@ struct MainContentView: View {
                 ParallaxBackground(scrollOffset: $scrollOffset, isLandscape: orientation.isLandscape)
                     .ignoresSafeArea()
                 
-                TabView(selection: $current) {
+                TabView(selection: currentPage) {
                     ForEach(0..<pages.count, id: \.self) { i in
                         pages[i]
                             .tag(i)
@@ -104,14 +93,10 @@ struct MainContentView: View {
 
             }
             .withModalProvider()
-            .withFloatingMenu(
-                buttons: menuButtons,
-                isExpanded: $isMenuExpanded,
-                isLandscape: orientation.isLandscape,
-                currentPage: current)
-            .ignoresSafeArea(.all, edges: [.top, .bottom])
-            .modifier(IgnoreSafeAreaWhenLandscape(isLandscape: orientation.isLandscape && current == 0))
+            .withFloatingMenu()
         }
+        .modifier(IgnoreSafeAreaWhenLandscape(isLandscape: orientation.isLandscape))
+        .ignoresSafeArea(.all, edges: [.top, .bottom])
         .environment(\.isLandscape, orientation.isLandscape)
         .environment(\.darkTheme, themeObserver.isDarkTheme)
     }

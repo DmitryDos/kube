@@ -7,6 +7,7 @@ struct PlaylistsView: View {
     @ObservedObject private var themeObserver = ThemeObserver.shared
     @Environment(\.isLandscape) private var isLandscape
     @State private var searchText: String = ""
+    @State private var pendingSearch: DispatchWorkItem?
 
     @State private var editingPlaylistID: UUID? = nil
     @State private var selectedTracks: Set<UUID> = []
@@ -17,7 +18,16 @@ struct PlaylistsView: View {
         let allTracks = trackController.tracks
         return allTracks.filter { selectedTracks.contains($0.id) }
     }
-    
+
+    var body: some View {
+        ZStack {
+            VStack(spacing: 0) {
+                searchBar
+                scrollContent
+            }
+        }
+    }
+
     private var filteredPlaylists: [Playlist] {
         let allPlaylists = playlistService.getPlaylistOrder()
         
@@ -28,60 +38,41 @@ struct PlaylistsView: View {
         let searchLowercased = searchText.lowercased()
         
         return allPlaylists.filter { playlist in
-            // Всегда показываем системные плейлисты
-            if playlist.id == PlaylistService.likedPlaylistID || playlist.id == PlaylistService.allMusicPlaylistID {
+            if playlist.id == PlaylistService.likedPlaylistID {
                 return true
             }
-            
-            // Всегда показываем редактируемый плейлист
+
             if playlist.id == editingPlaylistID {
                 return true
             }
-            
-            // Показываем плейлист если название совпадает с поиском
+
             return playlist.name.lowercased().contains(searchLowercased)
         }
     }
     
     private func filteredTracksForAllMusic() -> [Track] {
-        let allTracks = trackController.tracks
-        
-        if searchText.isEmpty {
-            return allTracks
-        }
-        
-        let searchLowercased = searchText.lowercased()
-        return allTracks.filter { track in
-            track.title.lowercased().contains(searchLowercased) ||
-            track.artist.lowercased().contains(searchLowercased)
-        }
+        return trackController.tracks
     }
     
     private func getTracksForPlaylist(_ playlist: Playlist) -> [Track] {
-        // Для редактируемого плейлиста показываем выбранные треки
         if playlist.id == editingPlaylistID {
             return editingPlaylistTracks
         }
         
         let tracks: [Track]
         
-        if playlist.id == PlaylistService.allMusicPlaylistID {
-            // Для "Вся музыка" фильтруем треки
-            tracks = filteredTracksForAllMusic()
-        } else if playlist.id == PlaylistService.likedPlaylistID {
-            // Для "Понравившееся" фильтруем треки
+        if playlist.id == PlaylistService.likedPlaylistID {
             tracks = playlistService.getTracksForPlaylist(playlist.id)
             if !searchText.isEmpty {
                 let searchLowercased = searchText.lowercased()
                 return tracks.filter { track in
                     track.title.lowercased().contains(searchLowercased) ||
-                    track.artist.lowercased().contains(searchLowercased)
+                    track.desc.lowercased().contains(searchLowercased)
                 }
             } else {
                 return tracks
             }
         } else {
-            // Для кастомных плейлистов ВСЕГДА показываем все треки (без фильтрации)
             tracks = playlistService.getTracksForPlaylist(playlist.id)
         }
         
@@ -95,8 +86,7 @@ struct PlaylistsView: View {
            playlistMatchesSearch(playlist) {
             return true
         }
-        
-        // Для пустых кастомных плейлистов показываем только если нет поиска
+
         return searchText.isEmpty
     }
 
@@ -106,36 +96,40 @@ struct PlaylistsView: View {
         let searchLowercased = searchText.lowercased()
         return playlist.name.lowercased().contains(searchLowercased)
     }
-    
-    var body: some View {
-        ZStack {
-            VStack(spacing: 0) {
-                // Выносим searchBar в отдельную переменную
-                searchBar
-                // Выносим scrollContent в отдельную переменную
-                scrollContent
-            }
-        }
-    }
 
     private var searchBar: some View {
         HStack {
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .foregroundColor(.black)
-                
-                TextField("Поиск треков и плейлистов", text: $searchText)
-                    .textFieldStyle(PlainTextFieldStyle())
-                    .foregroundColor(.black)
-            }
-            .padding(10)
-            .background(themeObserver.lightGlassColor)
-            .cornerRadius(50)
+            ExpandableSearchBar(
+                text: $searchText,
+                placeholder: "Поиск треков и плейлистов",
+                onSubmit: {
+                    triggerServerSearchNow()
+                },
+                onClear: {
+                    trackController.loadFirstPage(query: nil)
+                }
+            )
+            
+            Spacer()
+                .frame(width: isLandscape ? 0 : 54)
         }
-        .padding(.leading, 16)
-        .padding(.trailing, 78)
-        .padding(.top, isLandscape ? 32 : 8)
-        .padding(.bottom, 8)
+        .onChange(of: searchText) { _ in scheduleDebouncedServerSearch() }
+    }
+
+    private func scheduleDebouncedServerSearch() {
+        pendingSearch?.cancel()
+        let work = DispatchWorkItem { triggerServerSearchNow() }
+        pendingSearch = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35, execute: work)
+    }
+
+    private func triggerServerSearchNow() {
+        let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if q.isEmpty {
+            trackController.loadFirstPage(query: nil)
+        } else {
+            trackController.loadFirstPage(query: q)
+        }
     }
 
     private var scrollContent: some View {
@@ -149,7 +143,7 @@ struct PlaylistsView: View {
                     playlistSection(for: playlist)
                 }
             }
-            .padding(.vertical)
+            .padding(.horizontal, 8)
         }
     }
 
@@ -174,7 +168,6 @@ struct PlaylistsView: View {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(themeObserver.contrastColor)
             )
-            .padding(.horizontal, 16)
         }
         .buttonStyle(PressableButtonStyle())
         .contentShape(Rectangle())
@@ -209,7 +202,7 @@ struct PlaylistsView: View {
                         showTrackInfoModal(for: track)
                     },
                     onPlaylistLongPress: {
-                        if !isSystemPlaylist(playlist.id) && !isEditingPlaylist {
+                        if !isSystemPlaylist(playlist.id) && !isEditingPlaylist && playlist.id != PlaylistService.yourTracksPlaylistID {
                             startPlaylistEditing(playlist.id)
                         }
                     }
@@ -287,7 +280,7 @@ struct PlaylistsView: View {
     }
     
     private func isSystemPlaylist(_ id: UUID) -> Bool {
-        return id == PlaylistService.likedPlaylistID || id == PlaylistService.allMusicPlaylistID
+        return id == PlaylistService.likedPlaylistID || id == PlaylistService.yourTracksPlaylistID
     }
 }
 

@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import AVFoundation
 import UIKit
 
 struct AsyncTrackImage: View {
@@ -17,6 +16,7 @@ struct AsyncTrackImage: View {
     @State private var image: UIImage?
     @State private var isLoading = false
     @State private var downloadTask: URLSessionDataTask?
+    @ObservedObject private var themeObserver = ThemeObserver.shared
 
     init(track: Track, cornerRadius: CGFloat = 8, width: CGFloat? = nil) {
         self.track = track
@@ -28,7 +28,7 @@ struct AsyncTrackImage: View {
         GeometryReader { geometry in
             ZStack {
                 Rectangle()
-                    .fill(Color.gray.opacity(0.3))
+                    .fill(themeObserver.contrastColor)
                     .frame(width: geometry.size.width, height: geometry.size.height)
                 
                 Group {
@@ -68,82 +68,92 @@ struct AsyncTrackImage: View {
         isLoading = true
         
         // Если есть thumbnail URL от сервера - загружаем его
-        if let thumbnailURLString = track.thumbnailURL,
-           let thumbnailURL = URL(string: thumbnailURLString) {
-            loadRemoteThumbnail(from: thumbnailURL)
-        }
-        // Иначе генерируем из видео URL
-        else if let videoURL = track.playableURL {
-            generateThumbnail(from: videoURL)
-        }
-        // Если нет URL для видео - показываем иконку
-        else {
+        if let thumbnailURLString = track.thumbnailURL, !thumbnailURLString.isEmpty {
+            var fullURLString = thumbnailURLString
+            
+            // Если URL относительный (начинается с /), добавляем baseURL
+            if thumbnailURLString.hasPrefix("/") {
+                fullURLString = VideoService.shared.baseURL + thumbnailURLString
+            } 
+            // Если это UUID без префикса, строим путь к thumbnail endpoint
+            else if UUID(uuidString: thumbnailURLString) != nil {
+                fullURLString = VideoService.shared.baseURL + "/api/videos/\(thumbnailURLString)/thumbnail"
+            }
+            // Если это полный URL (http:// или https://), используем как есть
+            else if thumbnailURLString.hasPrefix("http://") || thumbnailURLString.hasPrefix("https://") {
+                // Используем как есть
+            }
+            // Иначе считаем относительным путем
+            else {
+                fullURLString = VideoService.shared.baseURL + "/" + thumbnailURLString
+            }
+            
+            if let thumbnailURL = URL(string: fullURLString) {
+                loadRemoteThumbnail(from: thumbnailURL)
+            } else {
+                print("[AsyncTrackImage] Invalid thumbnail URL: \(thumbnailURLString)")
+                isLoading = false
+            }
+        } else {
+            // Если нет thumbnail - показываем иконку
             isLoading = false
         }
     }
     
     private func loadRemoteThumbnail(from url: URL) {
-        downloadTask = URLSession.shared.dataTask(with: url) { data, response, error in
+        print("[AsyncTrackImage] Loading thumbnail from: \(url.absoluteString)")
+        
+        var request = URLRequest(url: url)
+        // Добавляем токен авторизации, если есть
+        if let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        downloadTask = URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 self.isLoading = false
                 
-                if let data = data, let image = UIImage(data: data) {
+                if let error = error {
+                    print("[AsyncTrackImage] Error loading thumbnail: \(error.localizedDescription)")
+                    return
+                }
+                
+                if let httpResponse = response as? HTTPURLResponse {
+                    print("[AsyncTrackImage] Thumbnail response status: \(httpResponse.statusCode)")
+                    print("[AsyncTrackImage] Content-Type: \(httpResponse.value(forHTTPHeaderField: "Content-Type") ?? "unknown")")
+                    print("[AsyncTrackImage] URL: \(url.absoluteString)")
+                    
+                    if httpResponse.statusCode != 200 {
+                        // Если это JSON ошибка, логируем её
+                        if let data = data, let errorString = String(data: data, encoding: .utf8) {
+                            print("[AsyncTrackImage] Error response: \(errorString.prefix(500))")
+                        }
+                        print("[AsyncTrackImage] Non-200 status code, skipping thumbnail")
+                        return
+                    }
+                }
+                
+                guard let data = data else {
+                    print("[AsyncTrackImage] No data received")
+                    return
+                }
+                
+                print("[AsyncTrackImage] Received data size: \(data.count) bytes")
+                print("[AsyncTrackImage] First 20 bytes: \(data.prefix(20).map { String(format: "%02x", $0) }.joined(separator: " "))")
+                
+                if let image = UIImage(data: data) {
+                    print("[AsyncTrackImage] Successfully loaded thumbnail, size: \(data.count) bytes")
                     self.image = image
                 } else {
-                    // Если не удалось загрузить thumbnail, пробуем сгенерировать из видео
-                    if let videoURL = self.track.playableURL {
-                        self.generateThumbnail(from: videoURL)
+                    print("[AsyncTrackImage] Failed to create image from data (size: \(data.count) bytes)")
+                    // Попробуем проверить, что это за данные
+                    if let stringData = String(data: data, encoding: .utf8) {
+                        print("[AsyncTrackImage] Data as string (first 200 chars): \(String(stringData.prefix(200)))")
                     }
                 }
             }
         }
         downloadTask?.resume()
-    }
-    
-    private func generateThumbnail(from url: URL) {
-        DispatchQueue.global(qos: .userInitiated).async {
-            let thumbnail = self.generateThumbnail(for: url)
-            
-            DispatchQueue.main.async {
-                self.image = thumbnail
-                self.isLoading = false
-            }
-        }
-    }
-    
-    private func generateThumbnail(for url: URL) -> UIImage? {
-        // Для удаленных видео создаем временный файл или используем AVAsset с URL
-        if url.isFileURL {
-            // Локальный файл
-            let asset = AVAsset(url: url)
-            return generateThumbnail(from: asset)
-        } else {
-            // Удаленный URL - создаем AVAsset с URL
-            let asset = AVAsset(url: url)
-            return generateThumbnail(from: asset)
-        }
-    }
-    
-    private func generateThumbnail(from asset: AVAsset) -> UIImage? {
-        let imageGenerator = AVAssetImageGenerator(asset: asset)
-        imageGenerator.appliesPreferredTrackTransform = true
-        
-        // Пробуем разные временные точки для лучшего thumbnail
-        let timePoints = [CMTime(seconds: 0, preferredTimescale: 60),
-                         CMTime(seconds: 5, preferredTimescale: 60),
-                         CMTime(seconds: 10, preferredTimescale: 60)]
-        
-        for time in timePoints {
-            do {
-                let cgImage = try imageGenerator.copyCGImage(at: time, actualTime: nil)
-                return UIImage(cgImage: cgImage)
-            } catch {
-                continue
-            }
-        }
-        
-        print("Не удалось сгенерировать thumbnail для трека: \(track.title)")
-        return nil
     }
     
     private func cancelDownload() {

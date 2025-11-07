@@ -7,9 +7,10 @@ class AuthService: ObservableObject {
     @Published var isAuthenticated = false
     @Published var currentUser: User?
     @Published var errorMessage: String?
+    @Environment(\.isLandscape) private var isLandscape
     
-    private let baseURL = "https://conversational-zoila-flexuosely.ngrok-free.dev"
-    private let tokenKey = "authToken"
+    private let baseURL = AppConfig.apiBaseURL
+    private let tokenKey = AppConfig.authTokenKey
     private let userKey = "currentUser"
     
     private init() {
@@ -219,9 +220,28 @@ class AuthService: ObservableObject {
             }
             
             do {
-                let decodedResponse = try JSONDecoder().decode(T.self, from: data)
+                let decoder = JSONDecoder()
+                // Настройка декодера для дат (ISO8601)
+                decoder.dateDecodingStrategy = .custom { decoder in
+                    let container = try decoder.singleValueContainer()
+                    let dateString = try container.decode(String.self)
+                    let fmt1 = ISO8601DateFormatter()
+                    fmt1.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                    if let d = fmt1.date(from: dateString) { return d }
+                    let fmt2 = ISO8601DateFormatter()
+                    fmt2.formatOptions = [.withInternetDateTime]
+                    if let d = fmt2.date(from: dateString) { return d }
+                    throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date: \(dateString)")
+                }
+                let decodedResponse = try decoder.decode(T.self, from: data)
                 completion(.success(decodedResponse))
             } catch {
+                // Логируем ошибку декодирования для диагностики
+                if let jsonString = String(data: data, encoding: .utf8) {
+                    print("[AuthService] Decode error: \(error)")
+                    print("[AuthService] Response data: \(jsonString)")
+                    print("[AuthService] Expected type: \(T.self)")
+                }
                 completion(.failure(error))
             }
         }.resume()

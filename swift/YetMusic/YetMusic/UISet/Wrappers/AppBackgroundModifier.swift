@@ -19,15 +19,12 @@ struct AppBackgroundModifier: ViewModifier {
     
     func body(content: Content) -> some View {
         content
-            .background(
-                RoundedRectangle(cornerRadius: cornerRadius + 6)
-                    .fill(themeObserver.contrastColor)
-            )
             .padding(padding)
-            .background(
-                RoundedRectangle(cornerRadius: cornerRadius + 6)
-                    .fill(themeObserver.backgroundGlassColor)
-                    .stroke(themeObserver.darkColor, lineWidth: strokeLineWidth)
+            .background(themeObserver.backgroundGlassColor.blur(radius: 2))
+            .cornerRadius(cornerRadius)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .stroke(themeObserver.contrastColor, lineWidth: 2)
             )
     }
 }

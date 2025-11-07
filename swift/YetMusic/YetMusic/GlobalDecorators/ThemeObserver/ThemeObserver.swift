@@ -67,7 +67,7 @@ class ThemeObserver: ObservableObject {
     }
     
     var backgroundGlassColor: Color {
-        isDarkTheme ? lightGlassColor : secondaryColor.opacity(0.8)
+        isDarkTheme ? lightGlassColor : darkGlassColor
     }
     
     var backgroundAccentColor: Color {

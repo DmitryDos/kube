@@ -4,8 +4,8 @@ import Combine
 final class BackgroundUploadService: NSObject {
     static let shared = BackgroundUploadService()
 
-    private let baseURL = "https://conversational-zoila-flexuosely.ngrok-free.dev"
-    private let tokenKey = "authToken"
+    private let baseURL = AppConfig.apiBaseURL
+    private let tokenKey = AppConfig.authTokenKey
     private let sessionIdentifier = "com.yetmusic.upload.background"
 
     private lazy var session: URLSession = {
@@ -26,14 +26,10 @@ final class BackgroundUploadService: NSObject {
         UserDefaults.standard.string(forKey: tokenKey)
     }
 
-    func enqueueUpload(fileURL: URL, title: String, description: String = "") {
+    func enqueueUpload(fileURL: URL) {
         guard let token = getToken() else { return }
 
-        guard var components = URLComponents(string: baseURL + "/api/videos/upload/raw") else { return }
-        var items = [URLQueryItem(name: "title", value: title)]
-        if !description.isEmpty { items.append(URLQueryItem(name: "description", value: description)) }
-        components.queryItems = items
-        guard let url = components.url else { return }
+        guard let url = URL(string: baseURL + "/api/videos/upload/raw") else { return }
 
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -42,7 +38,7 @@ final class BackgroundUploadService: NSObject {
 
         let task = session.uploadTask(with: request, fromFile: fileURL)
 
-        VideoTransferService.shared.registerUpload(task: task, fileURL: fileURL, title: title)
+        VideoTransferService.shared.registerUpload(task: task, fileURL: fileURL, title: "")
         task.resume()
     }
 
@@ -64,7 +60,24 @@ extension BackgroundUploadService: URLSessionTaskDelegate {
     }
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        VideoTransferService.shared.finish(task: task, error: error)
+        // Транспортная ошибка — сразу ошибка
+        if let error = error {
+            VideoTransferService.shared.finish(task: task, error: error)
+            return
+        }
+
+        // HTTP-ошибка — считаем неуспехом, чтобы UI не показывал "Готово"
+        if let http = task.response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+            let httpError = NSError(domain: "UploadHTTPError", code: http.statusCode, userInfo: [NSLocalizedDescriptionKey: "HTTP status \(http.statusCode)"])
+            VideoTransferService.shared.finish(task: task, error: httpError)
+            return
+        }
+
+        // Успех
+        VideoTransferService.shared.finish(task: task, error: nil)
+        DispatchQueue.main.async {
+            TrackController.shared.loadFirstPage()
+        }
     }
 }
 

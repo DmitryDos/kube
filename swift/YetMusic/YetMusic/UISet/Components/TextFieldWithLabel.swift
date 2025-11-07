@@ -14,6 +14,7 @@ struct TextFieldWithLabel: View {
     let placeholder: String
     @Binding var text: String
     var onChange: (() -> Void)? = nil
+    var isEditable: Bool = true
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -23,14 +24,22 @@ struct TextFieldWithLabel: View {
                     .foregroundColor(themeObserver.primaryGlassColor)
             }
             
-            TextField(placeholder, text: $text)
-                .padding()
-                .background(themeObserver.secondaryGlassColor)
-                .foregroundColor(themeObserver.textColor)
-                .cornerRadius(10)
-                .onChange(of: text) { _ in
-                    onChange?()
-                }
+            if isEditable {
+                TextField(placeholder, text: $text)
+                    .padding()
+                    .background(themeObserver.secondaryGlassColor)
+                    .foregroundColor(themeObserver.textColor)
+                    .cornerRadius(10)
+                    .onChange(of: text) { _ in
+                        onChange?()
+                    }
+            } else {
+                Text(text.isEmpty ? placeholder : text)
+                    .padding()
+                    .background(themeObserver.secondaryGlassColor.opacity(0.5))
+                    .foregroundColor(themeObserver.textColor.opacity(0.7))
+                    .cornerRadius(10)
+            }
         }
     }
 }

@@ -1,223 +1,418 @@
 package handler
 
 import (
-    "net/http"
-    "path/filepath"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"regexp"
     "strconv"
-    "video-service/internal/model"
-    "video-service/internal/service"
+	"video-service/internal/model"
+	"video-service/internal/service"
 
-    "github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type VideoHandler struct {
-    service *service.VideoService
+	service *service.VideoService
 }
 
 func NewVideoHandler(service *service.VideoService) *VideoHandler {
-    return &VideoHandler{service: service}
+	return &VideoHandler{service: service}
 }
 
 func (h *VideoHandler) UploadVideo(c *gin.Context) {
-    userID, exists := c.Get("userID")
-    if !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
-        return
-    }
-    userIDInt, ok := userID.(int)
-    if !ok {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID type"})
-        return
-    }
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+		return
+	}
+	userIDUUID, ok := userID.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID type"})
+		return
+	}
 
-    if err := c.Request.ParseMultipartForm(500 << 20); err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse form"})
-        return
-    }
+	if err := c.Request.ParseMultipartForm(500 << 20); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse form"})
+		return
+	}
 
-    // Получаем файл
-    file, header, err := c.Request.FormFile("video")
-    if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Video file is required"})
-        return
-    }
-    defer file.Close()
+	file, header, err := c.Request.FormFile("video")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Video file is required"})
+		return
+	}
+	defer file.Close()
 
-    if header.Size > 500<<20 {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "File too large"})
-        return
-    }
+	if header.Size > 500<<20 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "File too large"})
+		return
+	}
 
-    title := c.PostForm("title")
-    description := c.PostForm("description")
-    
-    if title == "" {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Title is required"})
-        return
-    }
+	fileHeader := &model.FileHeader{
+		File:     file,
+		Filename: header.Filename,
+		Size:     header.Size,
+	}
 
-    req := model.CreateVideoRequest{
-        Title:       title,
-        Description: description,
-    }
+	video, err := h.service.CreateVideoFile(userIDUUID, fileHeader)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload video"})
+		return
+	}
 
-    fileHeader := &model.FileHeader{
-        File:     file,
-        Filename: header.Filename,
-        Size:     header.Size,
-    }
+	ctx := c.Request.Context()
+	presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
+	if err != nil {
+		h.service.DeleteVideo(userIDUUID, video.ID)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate stream URL"})
+		return
+	}
 
-    video, err := h.service.CreateVideo(userIDInt, &req, fileHeader)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create video"})
-        return
-    }
+	var thumbnailURL string
+	if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
+		thumbnailURL = fmt.Sprintf("/api/videos/%s/thumbnail", video.ID.String())
+	}
 
-    // Generate presigned URL for immediate client use
-    ctx := c.Request.Context()
-    presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
-    if err != nil {
-        presignedURL = ""
-    }
+	var duration float64
+	if video.Duration.Valid {
+		duration = video.Duration.Float64
+	}
 
-    c.JSON(http.StatusCreated, gin.H{
-        "message": "Video uploaded successfully",
-        "video": model.VideoResponse{
-            ID:          video.ID,
-            Title:       video.Title,
-            Description: video.Description,
-            FileSize:    video.FileSize,
-            FileURL:     presignedURL,
-            Status:      video.Status,
-            CreatedAt:   video.CreatedAt,
-        },
-    })
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Video uploaded successfully",
+		"video": model.VideoResponse{
+			ID:           video.ID,
+			Title:        video.Title,
+			Description:  video.Description,
+			UserID:       video.UserID,
+			FileSize:     video.FileSize,
+			FileURL:      presignedURL,
+			ThumbnailURL: thumbnailURL,
+			Status:       video.Status,
+			Duration:     duration,
+			CreatedAt:    video.CreatedAt,
+		},
+	})
 }
 
-// UploadVideoRaw streams a raw request body (e.g., video/mp4) directly to storage.
-// Title and description are taken from query params: ?title=...&description=...
 func (h *VideoHandler) UploadVideoRaw(c *gin.Context) {
-    userID, exists := c.Get("userID")
-    if !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
-        return
-    }
-    userIDInt, ok := userID.(int)
-    if !ok {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID type"})
-        return
-    }
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+		return
+	}
+	userIDUUID, ok := userID.(uuid.UUID)
+	if !ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Invalid user ID type"})
+		return
+	}
 
-    title := c.Query("title")
-    description := c.Query("description")
-    if title == "" {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Title is required"})
-        return
-    }
+	contentType := c.GetHeader("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
 
-    contentType := c.GetHeader("Content-Type")
-    if contentType == "" {
-        contentType = "application/octet-stream"
-    }
+	video, err := h.service.CreateVideoStream(userIDUUID, c.Request.Body, "video", -1, contentType)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create video"})
+		return
+	}
 
-    // Derive a pseudo filename from content type
-    filename := "upload" + extFromContentType(contentType)
+	c.Writer.Header().Add("X-Uploaded-Video-ID", video.ID.String())
 
-    req := model.CreateVideoRequest{
-        Title:       title,
-        Description: description,
-    }
+	ctx := c.Request.Context()
+	presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
+	if err != nil {
+		h.service.DeleteVideo(userIDUUID, video.ID)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate stream URL"})
+		return
+	}
 
-    video, err := h.service.CreateVideoStream(userIDInt, &req, c.Request.Body, filename, -1, contentType)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create video"})
-        return
-    }
+	var thumbnailURL string
+	if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
+		thumbnailURL = fmt.Sprintf("/api/videos/%s/thumbnail", video.ID.String())
+	}
 
-    ctx := c.Request.Context()
-    presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
-    if err != nil {
-        presignedURL = ""
-    }
+	var duration float64
+	if video.Duration.Valid {
+		duration = video.Duration.Float64
+	}
 
-    c.JSON(http.StatusCreated, gin.H{
-        "message": "Video uploaded successfully",
-        "video": model.VideoResponse{
-            ID:          video.ID,
-            Title:       video.Title,
-            Description: video.Description,
-            FileSize:    video.FileSize,
-            FileURL:     presignedURL,
-            Status:      video.Status,
-            CreatedAt:   video.CreatedAt,
-        },
-    })
-}
-
-func extFromContentType(ct string) string {
-    switch ct {
-    case "video/mp4":
-        return ".mp4"
-    case "video/quicktime":
-        return ".mov"
-    case "video/x-matroska":
-        return ".mkv"
-    default:
-        return filepath.Ext(ct) // likely empty; kept for future mapping
-    }
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Video uploaded successfully",
+		"video": model.VideoResponse{
+			ID:           video.ID,
+			Title:        video.Title,
+			Description:  video.Description,
+			UserID:       video.UserID,
+			FileSize:     video.FileSize,
+			FileURL:      presignedURL,
+			ThumbnailURL: thumbnailURL,
+			Status:       video.Status,
+			Duration:     duration,
+			CreatedAt:    video.CreatedAt,
+		},
+	})
 }
 
 func (h *VideoHandler) GetVideos(c *gin.Context) {
-    userID, exists := c.Get("userID")
-    if !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
-        return
-    }
-    userIDInt := userID.(int)
+	userID, exists := c.Get("userID")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+		return
+	}
+	userIDUUID := userID.(uuid.UUID)
 
-    // Получаем параметры пагинации
-    pageStr := c.DefaultQuery("page", "0")
-    limitStr := c.DefaultQuery("limit", "0")
-    
-    page, _ := strconv.Atoi(pageStr)
-    limit, _ := strconv.Atoi(limitStr)
-    
-    // Если limit не указан, возвращаем все видео
-    videos, err := h.service.GetUserVideosPaginated(userIDInt, page, limit)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get videos"})
-        return
-    }
+	pageStr := c.DefaultQuery("page", "0")
+	limitStr := c.DefaultQuery("limit", "0")
+	
+	page, _ := strconv.Atoi(pageStr)
+	limit, _ := strconv.Atoi(limitStr)
+	
+	videos, err := h.service.GetUserVideosPaginated(userIDUUID, page, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get videos"})
+		return
+	}
 
-    c.JSON(http.StatusOK, gin.H{"videos": videos})
+	c.Writer.Header().Add("X-Videos-Count", strconv.Itoa(len(videos)))
+	c.JSON(http.StatusOK, gin.H{"videos": videos})
+}
+
+func (h *VideoHandler) SearchAllVideos(c *gin.Context) {
+	if _, exists := c.Get("userID"); !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+		return
+	}
+
+	pageStr := c.DefaultQuery("page", "0")
+	limitStr := c.DefaultQuery("limit", "20")
+	q := c.DefaultQuery("q", "")
+	userIDStr := c.DefaultQuery("user_id", "")
+	mine := c.DefaultQuery("mine", "false")
+
+	page, _ := strconv.Atoi(pageStr)
+	limit, _ := strconv.Atoi(limitStr)
+	var filterUserID *uuid.UUID
+	if mine == "true" {
+		if uid, ok := c.Get("userID"); ok {
+			if v, ok2 := uid.(uuid.UUID); ok2 { filterUserID = &v }
+		}
+	} else if userIDStr != "" {
+		if v, err := uuid.Parse(userIDStr); err == nil { filterUserID = &v }
+	}
+
+	videos, err := h.service.GetAllVideosPaginated(q, filterUserID, page, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search videos"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"videos": videos})
 }
 
 func (h *VideoHandler) StreamVideo(c *gin.Context) {
-    userID, exists := c.Get("userID")
-    if !exists {
-        c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
-        return
-    }
-    userIDInt := userID.(int)
+	videoID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
+		return
+	}
 
-    videoID, err := strconv.Atoi(c.Param("id"))
-    if err != nil {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
-        return
-    }
+	video, err := h.service.GetVideoPublic(videoID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
+		return
+	}
 
-    video, err := h.service.GetVideo(userIDInt, videoID)
-    if err != nil {
-        c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
-        return
-    }
+	ctx := c.Request.Context()
+	presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate stream URL"})
+		return
+	}
 
-    ctx := c.Request.Context()
-    presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
-    if err != nil {
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate stream URL"})
-        return
-    }
+	c.Redirect(http.StatusTemporaryRedirect, presignedURL)
+}
 
-    c.Redirect(http.StatusTemporaryRedirect, presignedURL)
+func (h *VideoHandler) GetStreamURL(c *gin.Context) {
+	videoID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
+		return
+	}
+
+	video, err := h.service.GetVideoPublic(videoID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
+		return
+	}
+
+	ctx := c.Request.Context()
+	presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate stream URL"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"url": presignedURL})
+}
+
+func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
+	idParam := c.Param("id")
+	log.Printf("[StreamVideoProxy] Received ID param: %s", idParam)
+	videoID, err := uuid.Parse(idParam)
+	if err != nil {
+		log.Printf("[StreamVideoProxy] Failed to parse UUID: %v, param: %s", err, idParam)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
+		return
+	}
+
+	log.Printf("[StreamVideoProxy] Parsed UUID: %s", videoID.String())
+	video, err := h.service.GetVideoPublic(videoID)
+	if err != nil {
+		log.Printf("[StreamVideoProxy] Video not found: %v, UUID: %s", err, videoID.String())
+		c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
+		return
+	}
+	log.Printf("[StreamVideoProxy] Found video: %s, file_path: %s", video.ID.String(), video.FilePath)
+
+	rangeHeader := c.GetHeader("Range")
+	var start, end int64 = 0, -1
+
+	if rangeHeader != "" {
+		re := regexp.MustCompile(`bytes=(\d+)-(\d*)`)
+		matches := re.FindStringSubmatch(rangeHeader)
+		if len(matches) == 3 {
+			start, _ = strconv.ParseInt(matches[1], 10, 64)
+			if matches[2] != "" {
+				end, _ = strconv.ParseInt(matches[2], 10, 64)
+			}
+		}
+	}
+
+	ctx := c.Request.Context()
+	totalSize, contentType, err := h.service.StatObject(ctx, video.FilePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get video info"})
+		return
+	}
+
+	if end < 0 || end >= totalSize {
+		end = totalSize - 1
+	}
+
+	obj, err := h.service.GetObjectRange(ctx, video.FilePath, start, end)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to stream video"})
+		return
+	}
+	defer obj.Close()
+
+	status := http.StatusOK
+	if rangeHeader != "" {
+		status = http.StatusPartialContent
+	}
+
+	c.Header("Accept-Ranges", "bytes")
+	c.Header("Content-Type", contentType)
+	if status == http.StatusPartialContent {
+		var contentLen int64
+		if end >= 0 {
+			contentLen = end - start + 1
+			c.Header("Content-Range", "bytes "+strconv.FormatInt(start,10)+"-"+strconv.FormatInt(end,10)+"/"+strconv.FormatInt(totalSize,10))
+		} else {
+			contentLen = totalSize - start
+			c.Header("Content-Range", "bytes "+strconv.FormatInt(start,10)+"-"+strconv.FormatInt(totalSize-1,10)+"/"+strconv.FormatInt(totalSize,10))
+		}
+		c.Header("Content-Length", strconv.FormatInt(contentLen, 10))
+		c.Status(http.StatusPartialContent)
+	} else {
+		c.Header("Content-Length", strconv.FormatInt(totalSize, 10))
+		c.Status(http.StatusOK)
+	}
+
+	if _, err := io.Copy(c.Writer, obj); err != nil {
+		return
+	}
+}
+
+func (h *VideoHandler) GetThumbnail(c *gin.Context) {
+	idParam := c.Param("id")
+	log.Printf("[GetThumbnail] Received ID param: %s", idParam)
+	videoID, err := uuid.Parse(idParam)
+	if err != nil {
+		log.Printf("[GetThumbnail] Failed to parse UUID: %v, param: %s", err, idParam)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
+		return
+	}
+
+	log.Printf("[GetThumbnail] Parsed UUID: %s", videoID.String())
+	video, err := h.service.GetVideoPublic(videoID)
+	if err != nil {
+		log.Printf("[GetThumbnail] Video not found: %v, UUID: %s", err, videoID.String())
+		c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
+		return
+	}
+	log.Printf("[GetThumbnail] Found video: %s, thumbnail_path: %v", video.ID.String(), video.ThumbnailPath)
+
+	if !video.ThumbnailPath.Valid || video.ThumbnailPath.String == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "Thumbnail not found"})
+		return
+	}
+
+	ctx := c.Request.Context()
+	totalSize, contentType, err := h.service.StatObject(ctx, video.ThumbnailPath.String)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get thumbnail info"})
+		return
+	}
+
+	log.Printf("[GetThumbnail] Video ID: %s, Path: %s, Size: %d, ContentType: %s", videoID, video.ThumbnailPath.String, totalSize, contentType)
+
+	obj, err := h.service.GetObjectRange(ctx, video.ThumbnailPath.String, 0, -1)
+	if err != nil {
+		log.Printf("[GetThumbnail] Error getting object: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get thumbnail"})
+		return
+	}
+	defer obj.Close()
+
+	if contentType == "" {
+		contentType = "image/jpeg"
+	}
+	
+	c.Header("Content-Type", contentType)
+	c.Header("Cache-Control", "public, max-age=3600")
+	c.Header("Content-Length", strconv.FormatInt(totalSize, 10))
+	
+	bytesWritten, err := io.Copy(c.Writer, obj)
+	if err != nil {
+		log.Printf("[GetThumbnail] Error copying data: %v, bytes written: %d", err, bytesWritten)
+		return
+	}
+	log.Printf("[GetThumbnail] Successfully sent %d bytes", bytesWritten)
+}
+
+func (h *VideoHandler) DeleteVideo(c *gin.Context) {
+	userID, exists := c.Get("userID")
+	if !exists { 
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "User ID not found in context"})
+		return 
+	}
+	userIDUUID := userID.(uuid.UUID)
+	
+	videoID, err := uuid.Parse(c.Param("id"))
+	if err != nil { 
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
+		return 
+	}
+	
+	if err := h.service.DeleteVideo(userIDUUID, videoID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete video"})
+		return
+	}
+	c.Status(http.StatusNoContent)
 }

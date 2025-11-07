@@ -1,20 +1,58 @@
 import SwiftUI
 
 struct FloatingActionMenu: View {
+    @Environment(\.currentPage) private var currentPage
+    @ObservedObject private var ui = UIStateService.shared
+
+    private var menuButtons: [ActionButton] {
+        [
+            ActionButton(
+                title: "Тема",
+                icon: themeObserver.isDarkTheme ? "sun.max.fill" : "moon.fill",
+                color: .orange
+            ) {
+                withAnimation {
+                    themeObserver.toggleTheme()
+                }
+            },
+
+            ActionButton(
+                title: "Профиль",
+                icon: "person.crop.circle",
+                color: .blue
+            ) {
+                currentPage.wrappedValue = 3
+            },
+            
+            ActionButton(
+                title: "Добавить треки",
+                icon: "arrow.down.circle.fill",
+                color: .yellow
+            ) {
+                ModalProvider.shared.show(AddTrackModal())
+            },
+            ActionButton(
+                title: "Загрузка",
+                icon: "tray.full",
+                color: .pink
+            ) {
+                ModalProvider.shared.show(VideoLoaderModal())
+            },
+        ]
+    }
+
     @ObservedObject private var themeObserver = ThemeObserver.shared
     @Environment(\.isLandscape) private var isLandscape
-    let buttons: [ActionButton]
 
-    @Binding var isExpanded: Bool
     @ObservedObject private var modalProvider = ModalProvider.shared
 
     var body: some View {
             VStack(alignment: .trailing, spacing: 12) {
-                if !isExpanded {
+                if !ui.isFloatingMenuOpen {
                     Button(action: {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                             openMenu()
-                            isExpanded = true
+                            ui.isFloatingMenuOpen = true
                         }
                     }) {
                         ZStack {
@@ -36,11 +74,12 @@ struct FloatingActionMenu: View {
     }
 
     private func openMenu() {
+        UIStateService.shared.isFloatingMenuOpen = true
         modalProvider.show(
-            FloatingActionMenuModal(buttons: buttons, isExpanded: $isExpanded),
+            FloatingActionMenuModal(buttons: menuButtons),
             onClose: {
                 withAnimation {
-                    isExpanded = false
+                    UIStateService.shared.isFloatingMenuOpen = false
                 }
             }
         )
@@ -49,24 +88,23 @@ struct FloatingActionMenu: View {
 
 
 struct WithFloatingMenuModifier: ViewModifier {
-    let buttons: [ActionButton]
-    let isLandscape: Bool
-    let currentPage: Int
-    @Binding var isExpanded: Bool
+    @Environment(\.currentPage) private var currentPage
+    @ObservedObject private var ui = UIStateService.shared
     
     func body(content: Content) -> some View {
         content.overlay(
             Group {
-                if !(isLandscape && currentPage == 0) {
-                    FloatingActionMenu(buttons: buttons, isExpanded: $isExpanded)
+                if !ui.isFullPlayerVisible {
+                    FloatingActionMenu()
                         .zIndex(9999)
                 }
             }
         )
     }
 }
+
 extension View {
-    func withFloatingMenu(buttons: [ActionButton], isExpanded: Binding<Bool>, isLandscape: Bool, currentPage: Int) -> some View {
-        self.modifier(WithFloatingMenuModifier(buttons: buttons, isLandscape: isLandscape, currentPage: currentPage, isExpanded: isExpanded))
+    func withFloatingMenu() -> some View {
+        self.modifier(WithFloatingMenuModifier())
     }
 }

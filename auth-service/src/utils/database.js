@@ -1,5 +1,9 @@
 import pg from 'pg';
-const { Pool } = pg;
+const { Pool, types } = pg;
+
+// Настройка типов PostgreSQL: UUID возвращается как строка
+// Тип UUID в PostgreSQL имеет OID 2950
+types.setTypeParser(2950, 'text', (val) => val);
 
 const pool = new Pool({
     host: process.env.DB_HOST || 'localhost',

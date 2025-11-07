@@ -16,6 +16,7 @@ import (
 
     "github.com/gin-gonic/gin"
     _ "github.com/lib/pq"
+    "github.com/google/uuid"
 )
 
 func main() {
@@ -47,6 +48,10 @@ func main() {
 
     log.Println("Database connected")
 
+    if err := backfillOwner(db); err != nil {
+        log.Printf("Backfill owner skipped/failed: %v", err)
+    }
+
     minioClient, err := storage.NewMinIOClient()
     if err != nil {
         log.Fatal("Failed to connect to MinIO:", err)
@@ -57,19 +62,34 @@ func main() {
     videoRepo := repository.NewVideoRepository(db)
     videoService := service.NewVideoService(videoRepo, minioClient)
     videoHandler := handler.NewVideoHandler(videoService)
+    searchHandler := handler.NewSearchHandler(videoService)
     healthHandler := handler.NewHealthHandler()
 
     r := gin.Default()
     
     r.GET("/health", healthHandler.HealthCheck)
-    
-    protected := r.Group("/api/videos")
-    protected.Use(handler.AuthenticateJWT())
+
+    api := r.Group("/api")
     {
-        protected.POST("/upload", videoHandler.UploadVideo)
-        protected.POST("/upload/raw", videoHandler.UploadVideoRaw)
-        protected.GET("/", videoHandler.GetVideos)
-        protected.GET("/:id/stream", videoHandler.StreamVideo)
+        protected := api.Group("")
+        protected.Use(handler.AuthenticateJWT())
+        {
+            videosGroup := protected.Group("/videos")
+            {
+                videosGroup.POST("/upload", videoHandler.UploadVideo)
+                videosGroup.POST("/upload/raw", videoHandler.UploadVideoRaw)
+                videosGroup.GET("/all", videoHandler.SearchAllVideos)
+                videosGroup.PUT("/:id", videoHandler.UpdateVideoMetadata)
+                videosGroup.PATCH("/:id", videoHandler.UpdateVideoMetadata)
+                videosGroup.DELETE("/:id", videoHandler.DeleteVideo)
+            }
+        }
+
+        api.GET("/search", searchHandler.SearchVideosAndAuthors)
+        api.GET("/videos/:id/stream", videoHandler.StreamVideo)
+        api.GET("/videos/:id/stream/url", videoHandler.GetStreamURL)
+        api.GET("/videos/:id/stream/proxy", videoHandler.StreamVideoProxy)
+        api.GET("/videos/:id/thumbnail", videoHandler.GetThumbnail)
     }
 
     port := ":3001"
@@ -111,4 +131,44 @@ func getEnv(key, defaultValue string) string {
         return value
     }
     return defaultValue
+}
+
+func backfillOwner(videoDB *sql.DB) error {
+    ownerIDEnv := os.Getenv("BACKFILL_OWNER_ID")
+    ownerEmail := os.Getenv("BACKFILL_OWNER_EMAIL")
+    if ownerIDEnv == "" && ownerEmail == "" {
+        return nil
+    }
+
+    var ownerID uuid.UUID
+    if ownerIDEnv != "" {
+        var err error
+        ownerID, err = uuid.Parse(ownerIDEnv)
+        if err != nil {
+            return fmt.Errorf("invalid BACKFILL_OWNER_ID: %w", err)
+        }
+    } else {
+        authConn := fmt.Sprintf(
+            "host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
+            getEnv("AUTH_DB_HOST", getEnv("DB_HOST", "localhost")),
+            getEnv("AUTH_DB_PORT", getEnv("DB_PORT", "5432")),
+            getEnv("AUTH_DB_USER", getEnv("DB_USER", "admin")),
+            getEnv("AUTH_DB_PASSWORD", getEnv("DB_PASSWORD", "password123")),
+            getEnv("AUTH_DB_NAME", "auth_service"),
+        )
+        adb, err := sql.Open("postgres", authConn)
+        if err != nil { return fmt.Errorf("auth db connect: %w", err) }
+        defer adb.Close()
+        if err := adb.Ping(); err != nil { return fmt.Errorf("auth db ping: %w", err) }
+        row := adb.QueryRow("SELECT id FROM users WHERE email = $1 LIMIT 1", ownerEmail)
+        if err := row.Scan(&ownerID); err != nil {
+            return fmt.Errorf("owner email not found: %w", err)
+        }
+    }
+
+    if _, err := videoDB.Exec("UPDATE videos SET user_id = $1", ownerID); err != nil {
+        return fmt.Errorf("update videos owner: %w", err)
+    }
+    log.Printf("Backfilled owner for all videos to user_id=%s", ownerID.String())
+    return nil
 }

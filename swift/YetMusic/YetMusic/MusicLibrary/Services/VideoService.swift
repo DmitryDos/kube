@@ -6,27 +6,10 @@
 //
 
 import Foundation
-
-struct Video: Codable, Identifiable {
-    let id: Int
-    let title: String
-    let description: String
-    let fileSize: Int64
-    let fileURL: String
-    let status: String
-    let createdAt: Date
-    
-    enum CodingKeys: String, CodingKey {
-        case id, title, description
-        case fileSize = "file_size"
-        case fileURL = "file_url"
-        case status
-        case createdAt = "created_at"
-    }
-}
+import UIKit
 
 struct VideoResponse: Codable {
-    let videos: [Video]
+    let videos: [Track]
 }
 
 struct CreateVideoRequest: Codable {
@@ -37,12 +20,12 @@ struct CreateVideoRequest: Codable {
 class VideoService: ObservableObject {
     static let shared = VideoService()
     
-    private let baseURL = "https://conversational-zoila-flexuosely.ngrok-free.dev"
-    private let tokenKey = "authToken"
+    let baseURL = AppConfig.apiBaseURL
+    private let tokenKey = AppConfig.authTokenKey
     private let session: URLSession = {
         let config = URLSessionConfiguration.default
-        config.timeoutIntervalForRequest = 300
-        config.timeoutIntervalForResource = 600
+        config.timeoutIntervalForRequest = AppConfig.requestTimeout
+        config.timeoutIntervalForResource = AppConfig.resourceTimeout
         if #available(iOS 13.0, *) {
             config.allowsExpensiveNetworkAccess = true
             config.allowsConstrainedNetworkAccess = true
@@ -51,94 +34,156 @@ class VideoService: ObservableObject {
         return URLSession(configuration: config)
     }()
     
-    @Published var videos: [Video] = []
+    @Published var videos: [Track] = []
     
     private init() {
         // Убираем loadVideos() из init, т.к. теперь требуется пагинация
+    }
+
+    struct StreamURLResponse: Codable { let url: String }
+
+    func fetchStreamURL(videoID: UUID) async throws -> URL {
+        guard let token = getToken() else { throw VideoError.unauthorized }
+        guard let url = URL(string: baseURL + "/api/videos/\(videoID)/stream/url") else { throw VideoError.invalidURL }
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw VideoError.invalidResponse
+        }
+        let decoded = try makeDecoder().decode(StreamURLResponse.self, from: data)
+        guard let finalURL = URL(string: decoded.url) else { throw VideoError.invalidURL }
+        return finalURL
+    }
+
+    func deleteVideo(videoID: UUID) async throws {
+        guard let token = getToken() else { throw VideoError.unauthorized }
+        guard let url = URL(string: baseURL + "/api/videos/\(videoID)") else { throw VideoError.invalidURL }
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (_, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+            throw VideoError.invalidResponse
+        }
+    }
+    
+    struct UpdateVideoResponse: Codable {
+        let message: String
+        let video: Track?
+    }
+    
+    func updateVideoMetadata(videoID: UUID, title: String? = nil, description: String? = nil, thumbnail: UIImage? = nil) async throws -> Track? {
+        guard let token = getToken() else { throw VideoError.unauthorized }
+        guard let url = URL(string: baseURL + "/api/videos/\(videoID)") else { throw VideoError.invalidURL }
+        
+        if let thumbnail = thumbnail {
+            guard let imageData = thumbnail.jpegData(compressionQuality: 0.8) else {
+                throw VideoError.invalidData
+            }
+            
+            let boundary = UUID().uuidString
+            var request = URLRequest(url: url)
+            request.httpMethod = "PUT"
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            
+            var body = Data()
+            
+            if let title = title {
+                body.append("--\(boundary)\r\n")
+                body.append("Content-Disposition: form-data; name=\"title\"\r\n\r\n")
+                body.append(title)
+                body.append("\r\n")
+            }
+            
+            if let description = description {
+                body.append("--\(boundary)\r\n")
+                body.append("Content-Disposition: form-data; name=\"description\"\r\n\r\n")
+                body.append(description)
+                body.append("\r\n")
+            }
+            
+            body.append("--\(boundary)\r\n")
+            body.append("Content-Disposition: form-data; name=\"thumbnail\"; filename=\"thumbnail.jpg\"\r\n")
+            body.append("Content-Type: image/jpeg\r\n\r\n")
+            body.append(imageData)
+            body.append("\r\n")
+            body.append("--\(boundary)--\r\n")
+            
+            request.httpBody = body
+            
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                throw VideoError.invalidResponse
+            }
+            
+            if let updateResponse = try? makeDecoder().decode(UpdateVideoResponse.self, from: data) {
+                return updateResponse.video
+            }
+            return nil
+        } else {
+            struct UpdateRequest: Codable {
+                let title: String?
+                let description: String?
+            }
+            
+            let updateRequest = UpdateRequest(title: title, description: description)
+            var request = URLRequest(url: url)
+            request.httpMethod = "PUT"
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONEncoder().encode(updateRequest)
+            
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                throw VideoError.invalidResponse
+            }
+            
+            if let updateResponse = try? makeDecoder().decode(UpdateVideoResponse.self, from: data) {
+                return updateResponse.video
+            }
+            return nil
+        }
     }
     
     private func getToken() -> String? {
         UserDefaults.standard.string(forKey: tokenKey)
     }
     
-    // MARK: - API Methods
-    
-    func uploadVideo(videoData: Data, title: String, description: String = "") async throws -> Video {
-        guard let token = getToken() else {
-            throw VideoError.unauthorized
-        }
-        
-        let boundary = UUID().uuidString
-        var request = URLRequest(url: URL(string: "\(baseURL)/api/videos/upload")!)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 300
-        
-        let httpBody = createMultipartBody(
-            videoData: videoData,
-            title: title,
-            description: description,
-            boundary: boundary
-        )
-        request.httpBody = httpBody
-        
-        let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw VideoError.invalidResponse
-        }
-        
-        guard (200...299).contains(httpResponse.statusCode) else {
-            if let errorData = String(data: data, encoding: .utf8) {
-                print("Server error response: \(errorData)")
-            }
-            throw VideoError.serverError(statusCode: httpResponse.statusCode)
-        }
-        
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        
-        struct UploadResponse: Codable {
-            let message: String
-            let video: Video
-        }
-        
-        let uploadResponse = try decoder.decode(UploadResponse.self, from: data)
-        
-        await MainActor.run {
-            videos.append(uploadResponse.video)
-        }
-        
-        return uploadResponse.video
-    }
-
-    // Streaming upload from a local file URL using URLSession.uploadTask
-    func uploadVideo(fileURL: URL, title: String, description: String = "") async throws -> Video {
-        return try await UploadService.shared.uploadVideo(fileURL: fileURL, title: title, description: description)
-    }
-    
-    func loadVideos(page: Int = 0, pageSize: Int = 20, completion: @escaping ([Video]) -> Void) {
+    func loadVideos(page: Int = 0, pageSize: Int = 20, query: String? = nil, userId: Int? = nil, mine: Bool = false, completion: @escaping ([Track]) -> Void) {
         guard let token = getToken() else {
             completion([])
             return
         }
         
+        var params = ["page=\(page)", "limit=\(pageSize)"]
+        if let q = query, !q.isEmpty, let encoded = q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            params.append("q=\(encoded)")
+        }
+        if mine {
+            params.append("mine=true")
+        } else if let userId = userId {
+            params.append("user_id=\(userId)")
+        }
+        let endpoint = "/api/videos/all?" + params.joined(separator: "&")
+
         makeRequest(
-            endpoint: "/api/videos/?page=\(page)&limit=\(pageSize)",
+            endpoint: endpoint,
             method: "GET",
             token: token
         ) { (result: Result<VideoResponse, Error>) in
             switch result {
             case .success(let response):
+                print("[VideoService] Loaded videos count: \(response.videos.count)")
                 completion(response.videos)
             case .failure:
+                print("[VideoService] Failed to load videos")
                 completion([])
             }
         }
     }
-    
-    // MARK: - Network Helper
     
     private func makeRequest<T: Decodable>(
         endpoint: String,
@@ -181,6 +226,9 @@ class VideoService: ObservableObject {
             }
             
             guard (200...299).contains(httpResponse.statusCode) else {
+                if let data = data, let raw = String(data: data, encoding: .utf8) {
+                    print("[VideoService] Server error (\(httpResponse.statusCode)): \n\(raw)")
+                }
                 let statusError = VideoError.serverError(statusCode: httpResponse.statusCode)
                 completion(.failure(statusError))
                 return
@@ -192,43 +240,42 @@ class VideoService: ObservableObject {
             }
             
             do {
-                let decoder = JSONDecoder()
-                decoder.dateDecodingStrategy = .iso8601
+                let decoder = makeDecoder()
                 let decodedResponse = try decoder.decode(T.self, from: data)
                 completion(.success(decodedResponse))
             } catch {
+                if let raw = String(data: data, encoding: .utf8) {
+                    print("[VideoService] Decode error: \(error)\nRaw: \n\(raw)")
+                }
                 completion(.failure(error))
             }
         }.resume()
     }
-    
-    private func createMultipartBody(videoData: Data, title: String, description: String, boundary: String) -> Data {
-        var body = Data()
-        
-        // Добавляем title
-        body.append("--\(boundary)\r\n")
-        body.append("Content-Disposition: form-data; name=\"title\"\r\n\r\n")
-        body.append("\(title)\r\n")
-        
-        // Добавляем description
-        if !description.isEmpty {
-            body.append("--\(boundary)\r\n")
-            body.append("Content-Disposition: form-data; name=\"description\"\r\n\r\n")
-            body.append("\(description)\r\n")
+}
+
+extension Data {
+    mutating func append(_ string: String) {
+        if let data = string.data(using: .utf8) {
+            append(data)
         }
-        
-        // Добавляем видео файл
-        body.append("--\(boundary)\r\n")
-        body.append("Content-Disposition: form-data; name=\"video\"; filename=\"video.mp4\"\r\n")
-        body.append("Content-Type: video/mp4\r\n\r\n")
-        body.append(videoData)
-        body.append("\r\n")
-        
-        // Завершаем boundary
-        body.append("--\(boundary)--\r\n")
-        
-        return body
     }
+}
+
+// MARK: - Decoder helper
+private func makeDecoder() -> JSONDecoder {
+    let decoder = JSONDecoder()
+    decoder.dateDecodingStrategy = .custom { decoder in
+        let container = try decoder.singleValueContainer()
+        let dateString = try container.decode(String.self)
+        let fmt1 = ISO8601DateFormatter()
+        fmt1.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let d = fmt1.date(from: dateString) { return d }
+        let fmt2 = ISO8601DateFormatter()
+        fmt2.formatOptions = [.withInternetDateTime]
+        if let d = fmt2.date(from: dateString) { return d }
+        throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date: \(dateString)")
+    }
+    return decoder
 }
 
 enum VideoError: LocalizedError {
@@ -253,15 +300,6 @@ enum VideoError: LocalizedError {
             return "Неверный URL"
         case .noData:
             return "Нет данных"
-        }
-    }
-}
-
-// MARK: - Data Extensions
-extension Data {
-    mutating func append(_ string: String) {
-        if let data = string.data(using: .utf8) {
-            append(data)
         }
     }
 }

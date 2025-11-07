@@ -14,15 +14,15 @@ struct PlaylistTrackView: View {
     @State private var isPressed = false
 
     private var isInQueue: Bool {
-        return queueService.currentQueue.contains(where: { $0.id == track.id }) ||
-               queueService.wishlistQueue.contains(where: { $0.id == track.id })
+        // Кнопка скрывается только если трек уже в очереди (upcoming)
+        return queueService.wishlistQueue.contains(where: { $0.id == track.id })
     }
     
     var body: some View {
         ZStack(alignment: .bottom) {
             AsyncTrackImage(
                 track: track,
-                cornerRadius: 14
+                cornerRadius: 10
             )
 
             if isEditingMode {
@@ -51,7 +51,7 @@ struct PlaylistTrackView: View {
                         .foregroundColor(themeObserver.darkColor)
                         .lineLimit(1)
                     
-                    Text(track.artist)
+                    Text(track.desc)
                         .font(.system(size: 12))
                         .foregroundColor(themeObserver.darkColor.opacity(0.7))
                         .lineLimit(1)
