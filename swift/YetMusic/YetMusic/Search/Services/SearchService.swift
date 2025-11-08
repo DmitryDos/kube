@@ -16,6 +16,13 @@ class SearchService: ObservableObject {
     private var currentFilter: SearchFilter = .all
     private var hasLoadedInitialVideos = false
     
+    private lazy var session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.urlCache = nil
+        config.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        return URLSession(configuration: config)
+    }()
+    
     func search(query: String, filter: SearchFilter = .all, loadMore: Bool = false) {
         guard !query.isEmpty else {
             loadPopularVideos(force: true)
@@ -43,12 +50,45 @@ class SearchService: ObservableObject {
             URLQueryItem(name: "filter", value: filter.rawValue.lowercased())
         ]
         
-        guard let url = urlComponents?.url else { return }
+        guard let url = urlComponents?.url else { 
+            print("[SearchService] ❌ ERROR: Failed to create URL")
+            isLoading = false
+            return 
+        }
+        
+        print("[SearchService] 📤 REQUEST (search):")
+        print("  URL: \(url.absoluteString)")
         
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            print("  Authorization: Bearer \(token.prefix(20))...")
+        } else {
+            print("  Authorization: none")
+        }
+        print("  Method: GET")
+        print("  Headers: \(request.allHTTPHeaderFields ?? [:])")
         
-        URLSession.shared.dataTaskPublisher(for: request)
+        session.dataTaskPublisher(for: request)
+            .handleEvents(
+                receiveOutput: { data, response in
+                    print("[SearchService] 📥 RESPONSE (search):")
+                    if let httpResponse = response as? HTTPURLResponse {
+                        print("  Status: \(httpResponse.statusCode)")
+                        print("  Headers: \(httpResponse.allHeaderFields)")
+                    }
+                    if let dataString = String(data: data, encoding: .utf8) {
+                        let preview = dataString.prefix(500)
+                        print("  Body preview (first 500 chars): \(preview)")
+                        if dataString.hasPrefix("<") {
+                            print("  ⚠️ WARNING: Response is HTML, not JSON!")
+                        }
+                    }
+                    print("  Data size: \(data.count) bytes")
+                }
+            )
             .map(\.data)
             .decode(type: SearchResponse.self, decoder: jsonDecoder)
             .map { response in
@@ -61,6 +101,9 @@ class SearchService: ObservableObject {
                     print("[SearchService] Search error: \(error)")
                     if let decodingError = error as? DecodingError {
                         print("[SearchService] Decoding error details: \(decodingError)")
+                    }
+                    if let urlError = error as? URLError {
+                        print("[SearchService] URL error: \(urlError)")
                     }
                     self?.error = "Ошибка загрузки результатов: \(error.localizedDescription)"
                 }
@@ -78,10 +121,7 @@ class SearchService: ObservableObject {
     }
     
     func loadPopularVideos(force: Bool = false) {
-        // Загружаем только один раз при первом вызове, если не принудительно
-        if hasLoadedInitialVideos && !force {
-            return
-        }
+        searchResults = []
         
         isLoading = true
         currentQuery = ""
@@ -95,12 +135,45 @@ class SearchService: ObservableObject {
             URLQueryItem(name: "limit", value: "20")
         ]
         
-        guard let url = urlComponents?.url else { return }
+        guard let url = urlComponents?.url else { 
+            print("[SearchService] ❌ ERROR: Failed to create URL")
+            isLoading = false
+            return 
+        }
+        
+        print("[SearchService] 📤 REQUEST:")
+        print("  URL: \(url.absoluteString)")
         
         var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            print("  Authorization: Bearer \(token.prefix(20))...")
+        } else {
+            print("  Authorization: none")
+        }
+        print("  Method: GET")
+        print("  Headers: \(request.allHTTPHeaderFields ?? [:])")
         
         URLSession.shared.dataTaskPublisher(for: request)
+            .handleEvents(
+                receiveOutput: { data, response in
+                    print("[SearchService] 📥 RESPONSE:")
+                    if let httpResponse = response as? HTTPURLResponse {
+                        print("  Status: \(httpResponse.statusCode)")
+                        print("  Headers: \(httpResponse.allHeaderFields)")
+                    }
+                    if let dataString = String(data: data, encoding: .utf8) {
+                        let preview = dataString.prefix(500)
+                        print("  Body preview (first 500 chars): \(preview)")
+                        if dataString.hasPrefix("<") {
+                            print("  ⚠️ WARNING: Response is HTML, not JSON!")
+                        }
+                    }
+                    print("  Data size: \(data.count) bytes")
+                }
+            )
             .map(\.data)
             .decode(type: SearchResponse.self, decoder: jsonDecoder)
             .map { response in
@@ -113,6 +186,9 @@ class SearchService: ObservableObject {
                     print("[SearchService] Load popular videos error: \(error)")
                     if let decodingError = error as? DecodingError {
                         print("[SearchService] Decoding error details: \(decodingError)")
+                    }
+                    if let urlError = error as? URLError {
+                        print("[SearchService] URL error: \(urlError)")
                     }
                     self?.error = "Ошибка загрузки: \(error.localizedDescription)"
                 }
@@ -127,11 +203,75 @@ class SearchService: ObservableObject {
     }
     
     func loadMoreResults() {
-        // Загружаем больше результатов только если есть активный поисковый запрос
-        // Для популярных видео пагинация не нужна
         guard !currentQuery.isEmpty, hasMoreResults, !isLoading else { return }
         print("[SearchService] Loading more results for query: \(currentQuery), page: \(currentPage + 1)")
         search(query: currentQuery, filter: currentFilter, loadMore: true)
+    }
+    
+    func searchWithPagination(
+        query: String?,
+        filter: SearchFilter = .videos,
+        page: Int,
+        pageSize: Int = 20,
+        userId: UUID? = nil,
+        mine: Bool = false,
+        trackIds: [UUID]? = nil,
+        completion: @escaping (Int, [Track], Bool) -> Void
+    ) {
+        var urlComponents = URLComponents(string: "\(baseURL)/api/search")
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "page", value: "\(page)"),
+            URLQueryItem(name: "limit", value: "\(pageSize)"),
+            URLQueryItem(name: "filter", value: filter.rawValue.lowercased())
+        ]
+        
+        if let q = query, !q.isEmpty {
+            queryItems.append(URLQueryItem(name: "q", value: q))
+        }
+        
+        if mine {
+            queryItems.append(URLQueryItem(name: "mine", value: "true"))
+        } else if let userId = userId {
+            queryItems.append(URLQueryItem(name: "user_id", value: userId.uuidString))
+        }
+        
+        urlComponents?.queryItems = queryItems
+        
+        guard let url = urlComponents?.url else {
+            completion(page, [], false)
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        session.dataTaskPublisher(for: request)
+            .map(\.data)
+            .decode(type: SearchResponse.self, decoder: jsonDecoder)
+            .map { response -> (Int, [Track], Bool) in
+                let tracks = response.results.compactMap { result -> Track? in
+                    guard case .video(let track) = result else { return nil }
+                    if let trackIds = trackIds {
+                        return trackIds.contains(track.id) ? track : nil
+                    }
+                    return track
+                }
+                let hasMore = tracks.count >= pageSize
+                return (page, tracks, hasMore)
+            }
+            .receive(on: DispatchQueue.main)
+            .sink { result in
+                if case .failure = result {
+                    completion(page, [], false)
+                }
+            } receiveValue: { page, tracks, hasMore in
+                completion(page, tracks, hasMore)
+            }
+            .store(in: &cancellables)
     }
     
     func clearResults() {
@@ -140,6 +280,21 @@ class SearchService: ObservableObject {
         currentPage = 1
         currentQuery = ""
         hasMoreResults = true
+        hasLoadedInitialVideos = false
+        
+        URLCache.shared.removeAllCachedResponses()
+    }
+    
+    static func clearAllCaches() {
+        URLCache.shared.removeAllCachedResponses()
+        
+        if let cookies = HTTPCookieStorage.shared.cookies {
+            for cookie in cookies {
+                HTTPCookieStorage.shared.deleteCookie(cookie)
+            }
+        }
+        
+        SearchService.shared.clearResults()
     }
     
     private var jsonDecoder: JSONDecoder {
@@ -148,25 +303,20 @@ class SearchService: ObservableObject {
             let container = try decoder.singleValueContainer()
             let dateString = try container.decode(String.self)
             
-            // Пробуем разные форматы ISO8601/RFC3339
             let formats = [
-                // ISO8601 с дробными секундами и часовым поясом
                 "yyyy-MM-dd'T'HH:mm:ss.SSSSSSZZZZZ",
                 "yyyy-MM-dd'T'HH:mm:ss.SSSSZZZZZ",
                 "yyyy-MM-dd'T'HH:mm:ss.SSSZZZZZ",
                 "yyyy-MM-dd'T'HH:mm:ss.SSZZZZZ",
                 "yyyy-MM-dd'T'HH:mm:ss.SZZZZZ",
-                // ISO8601 с дробными секундами UTC
                 "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'",
                 "yyyy-MM-dd'T'HH:mm:ss.SSSSS'Z'",
                 "yyyy-MM-dd'T'HH:mm:ss.SSSS'Z'",
                 "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
                 "yyyy-MM-dd'T'HH:mm:ss.SS'Z'",
                 "yyyy-MM-dd'T'HH:mm:ss.S'Z'",
-                // ISO8601 с часовым поясом
                 "yyyy-MM-dd'T'HH:mm:ssZZZZZ",
                 "yyyy-MM-dd'T'HH:mm:ss'Z'",
-                // ISO8601 без секунд
                 "yyyy-MM-dd'T'HH:mmZZZZZ",
                 "yyyy-MM-dd'T'HH:mm'Z'"
             ]
@@ -182,7 +332,6 @@ class SearchService: ObservableObject {
                 }
             }
             
-            // Пробуем ISO8601DateFormatter с различными опциями
             let isoFormatter1 = ISO8601DateFormatter()
             isoFormatter1.formatOptions = [.withInternetDateTime, .withFractionalSeconds, .withTimeZone]
             if let date = isoFormatter1.date(from: dateString) {

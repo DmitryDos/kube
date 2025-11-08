@@ -1,6 +1,6 @@
 import Foundation
 
-final class UploadService {
+final class UploadService: NSObject {
     static let shared = UploadService()
 
     private let baseURL = AppConfig.apiBaseURL
@@ -15,8 +15,10 @@ final class UploadService {
             config.allowsConstrainedNetworkAccess = true
             config.waitsForConnectivity = true
         }
-        return URLSession(configuration: config)
+        return URLSession(configuration: config, delegate: self, delegateQueue: nil)
     }()
+
+    private var uploadTasks: [Int: (continuation: CheckedContinuation<Track, Error>, fileName: String, responseData: Data)] = [:]
 
     private func getToken() -> String? {
         UserDefaults.standard.string(forKey: tokenKey)
@@ -53,21 +55,81 @@ final class UploadService {
         body.append("\r\n".data(using: .utf8)!)
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
 
-        request.httpBody = body
-
-        let (data, response) = try await session.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw VideoError.invalidResponse
+        // Используем uploadTask с Data для получения данных ответа
+        // Для больших файлов это может быть проблемой, но необходимо для получения ответа
+        return try await withCheckedThrowingContinuation { continuation in
+            let fileName = fileURL.lastPathComponent
+            
+            // Создаем uploadTask с Data
+            let task = session.uploadTask(with: request, from: body)
+            
+            // Регистрируем задачу для отслеживания прогресса
+            uploadTasks[task.taskIdentifier] = (continuation: continuation, fileName: fileName, responseData: Data())
+            VideoTransferService.shared.registerUpload(task: task, fileURL: fileURL, title: fileName)
+            
+            task.resume()
         }
+    }
+}
+
+extension UploadService: URLSessionTaskDelegate {
+    func urlSession(_ session: URLSession, task: URLSessionTask, didSendBodyData bytesSent: Int64, totalBytesSent: Int64, totalBytesExpectedToSend: Int64) {
+        VideoTransferService.shared.updateProgress(task: task, sent: totalBytesSent, expected: totalBytesExpectedToSend)
+    }
+
+    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        guard var taskInfo = uploadTasks.removeValue(forKey: task.taskIdentifier) else {
+            return
+        }
+
+        if let error = error {
+            VideoTransferService.shared.finish(task: task, error: error)
+            taskInfo.continuation.resume(throwing: error)
+            return
+        }
+
+        guard let httpResponse = task.response as? HTTPURLResponse else {
+            let responseError = VideoError.invalidResponse
+            VideoTransferService.shared.finish(task: task, error: responseError)
+            taskInfo.continuation.resume(throwing: responseError)
+            return
+        }
+
         guard (200...299).contains(httpResponse.statusCode) else {
-            if let err = String(data: data, encoding: .utf8) { print("Server error response: \(err)") }
-            throw VideoError.serverError(statusCode: httpResponse.statusCode)
+            let serverError = VideoError.serverError(statusCode: httpResponse.statusCode)
+            VideoTransferService.shared.finish(task: task, error: serverError)
+            taskInfo.continuation.resume(throwing: serverError)
+            return
         }
 
-        let decoder = makeDecoder()
-        let uploadResponse = try decoder.decode(UploadResponse.self, from: data)
-        return uploadResponse.video
+        // Данные должны быть получены через URLSessionDataDelegate.didReceive
+        // Если данных нет, значит ответ пустой
+        if taskInfo.responseData.isEmpty {
+            let responseError = VideoError.invalidResponse
+            VideoTransferService.shared.finish(task: task, error: responseError)
+            taskInfo.continuation.resume(throwing: responseError)
+        } else {
+            // Данные получены, декодируем их
+            do {
+                let decoder = makeDecoder()
+                let uploadResponse = try decoder.decode(UploadResponse.self, from: taskInfo.responseData)
+                VideoTransferService.shared.finish(task: task, error: nil)
+                taskInfo.continuation.resume(returning: uploadResponse.video)
+            } catch {
+                VideoTransferService.shared.finish(task: task, error: error)
+                taskInfo.continuation.resume(throwing: error)
+            }
+        }
+    }
+}
+
+extension UploadService: URLSessionDataDelegate {
+    func urlSession(_ session: URLSession, dataTask: URLSessionDataTask, didReceive data: Data) {
+        // Накапливаем данные ответа
+        if var taskInfo = uploadTasks[dataTask.taskIdentifier] {
+            taskInfo.responseData.append(data)
+            uploadTasks[dataTask.taskIdentifier] = taskInfo
+        }
     }
 }
 

@@ -93,6 +93,7 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
 			ThumbnailURL: thumbnailURL,
 			Status:       video.Status,
 			Duration:     duration,
+			IsPrivate:    video.IsPrivate,
 			CreatedAt:    video.CreatedAt,
 		},
 	})
@@ -153,6 +154,7 @@ func (h *VideoHandler) UploadVideoRaw(c *gin.Context) {
 			ThumbnailURL: thumbnailURL,
 			Status:       video.Status,
 			Duration:     duration,
+			IsPrivate:    video.IsPrivate,
 			CreatedAt:    video.CreatedAt,
 		},
 	})
@@ -197,15 +199,24 @@ func (h *VideoHandler) SearchAllVideos(c *gin.Context) {
 	page, _ := strconv.Atoi(pageStr)
 	limit, _ := strconv.Atoi(limitStr)
 	var filterUserID *uuid.UUID
-	if mine == "true" {
-		if uid, ok := c.Get("userID"); ok {
-			if v, ok2 := uid.(uuid.UUID); ok2 { filterUserID = &v }
+	var currentUserID *uuid.UUID
+	
+	if uid, ok := c.Get("userID"); ok {
+		if v, ok2 := uid.(uuid.UUID); ok2 {
+			currentUserID = &v
+			if mine == "true" {
+				filterUserID = &v
+			}
 		}
-	} else if userIDStr != "" {
-		if v, err := uuid.Parse(userIDStr); err == nil { filterUserID = &v }
+	}
+	
+	if mine != "true" && userIDStr != "" {
+		if v, err := uuid.Parse(userIDStr); err == nil {
+			filterUserID = &v
+		}
 	}
 
-	videos, err := h.service.GetAllVideosPaginated(q, filterUserID, page, limit)
+	videos, err := h.service.GetAllVideosPaginated(q, filterUserID, currentUserID, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search videos"})
 		return

@@ -13,7 +13,8 @@ protocol DownloadService {
 
 class URLSessionDownloadService: DownloadService {
     func downloadFile(from url: URL, toFileName: String) async throws -> URL {
-        let (tempURL, _) = try await URLSession.shared.download(from: url)
+        var request = URLRequest(url: url)
+        let (tempURL, _) = try await URLSession.shared.download(for: request)
         
         let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let destinationURL = documentsDirectory.appendingPathComponent(toFileName)

@@ -1,10 +1,6 @@
 import SwiftUI
 
 struct SearchDockModal: View {
-    @ObservedObject private var themeObserver = ThemeObserver.shared
-    @ObservedObject private var trackController = TrackController.shared
-    @ObservedObject private var queueService = QueueService.shared
-    
     @State private var query: String = ""
     @State private var isExpanded: Bool = false
     @FocusState private var isFocused: Bool

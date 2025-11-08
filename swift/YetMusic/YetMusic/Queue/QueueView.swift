@@ -3,7 +3,6 @@ import SwiftUI
 struct QueueView: View {
     @ObservedObject private var queueService = QueueService.shared
     @ObservedObject private var historyService = HistoryService.shared
-    @ObservedObject private var audioService = AudioPlayerService.shared
     @ObservedObject private var themeObserver = ThemeObserver.shared
     @Environment(\.isLandscape) private var isLandscape
     @State private var historyItems: [HistoryService.HistoryItem] = []
@@ -27,13 +26,12 @@ struct QueueView: View {
                 GeometryReader { geo in
                     VStack(alignment: .leading, spacing: 10) {
                         if selectedIsRecent() {
-                            // Секция "Недавно" - история воспроизведения
                             StackSectionView(
                                 tracks: stackTracks,
                                 currentIndex: stackIndex,
                                 onSelectIndex: { index in
                                     if index == stackIndex {
-                                        if audioService.trackInfo.isPlaying { audioService.pause() } else { audioService.play() }
+                                        queueService.togglePlayPause()
                                     } else {
                                         queueService.playFromStack(index: index)
                                     }
@@ -42,11 +40,11 @@ struct QueueView: View {
                             )
                             .frame(maxHeight: geo.size.height)
                         } else if selectedIsQueue() {
-                            // Секция "Очередь" - wishlist queue
                             QueueSectionView(
                                 tracks: upcomingTracks,
                                 onTap: { track in
                                     queueService.playTrack(track)
+                                    historyService.recordPlayed(track)
                                 },
                                 onDelete: { track in
                                     queueService.removeTrackFromQueues(track)
@@ -58,7 +56,6 @@ struct QueueView: View {
                             )
                             .frame(maxHeight: geo.size.height)
                         } else {
-                            // История по дням
                             HistorySectionView(items: historyItems) { track in
                                 queueService.playTrack(track)
                             }

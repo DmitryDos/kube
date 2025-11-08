@@ -35,14 +35,13 @@ final class HistoryService: ObservableObject {
 
         if let existing = try? context.fetch(dayDescriptor) {
             let exists = existing.contains { entry in
-                if let tid = entry.trackId { return tid == track.id }
-                return entry.track?.id == track.id
+                return entry.trackId == track.id
             }
             if exists { return }
         }
 
+        // Создаем entry без связи с Track - только сохраняем данные
         let entry = HistoryEntry(dayStart: day, track: track)
-        entry.track = nil
         context.insert(entry)
         persistence.saveIfNeeded()
         DispatchQueue.main.async { self.lastUpdate = Date() }
@@ -66,10 +65,7 @@ final class HistoryService: ObservableObject {
             sortBy: [SortDescriptor(\HistoryEntry.createdAt, order: .forward)]
         )
         guard let entries = try? context.fetch(descriptor) else { return [] }
-        let all = TrackController.shared.tracks
         return entries.map { entry in
-            let id = entry.trackId ?? entry.track?.id
-            let resolved = id.flatMap { tid in all.first(where: { $0.id == tid }) }
             return HistoryItem(
                 id: entry.id,
                 dayStart: entry.dayStart,
@@ -78,7 +74,7 @@ final class HistoryService: ObservableObject {
                 desc: entry.savedDesc,
                 duration: entry.savedDuration,
                 thumbnailURL: entry.savedThumbnailURL,
-                track: resolved
+                track: nil
             )
         }
     }

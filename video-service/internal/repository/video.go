@@ -20,8 +20,8 @@ func NewVideoRepository(db *sql.DB) *VideoRepository {
 
 func (r *VideoRepository) Create(video *model.Video) error {
 	query := `
-		INSERT INTO videos (id, title, description, file_path, file_size, thumbnail_path, user_id, status)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO videos (id, title, description, file_path, file_size, thumbnail_path, user_id, status, is_private)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING created_at, updated_at
 	`
 
@@ -42,6 +42,7 @@ func (r *VideoRepository) Create(video *model.Video) error {
 		thumbnailPath,
 		video.UserID,
 		video.Status,
+		video.IsPrivate,
 	).Scan(&video.CreatedAt, &video.UpdatedAt)
 }
 
@@ -51,7 +52,7 @@ func (r *VideoRepository) FindByUserID(userID uuid.UUID) ([]model.Video, error) 
 
 func (r *VideoRepository) FindByUserIDPaginated(userID uuid.UUID, page, pageSize int) ([]model.Video, error) {
 	query := `
-		SELECT id, title, description, file_path, file_size, duration, thumbnail_path, user_id, status, created_at, updated_at
+		SELECT id, title, description, file_path, file_size, duration, thumbnail_path, user_id, status, is_private, created_at, updated_at
 		FROM videos
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -84,6 +85,7 @@ func (r *VideoRepository) FindByUserIDPaginated(userID uuid.UUID, page, pageSize
 			&video.ThumbnailPath,
 			&video.UserID,
 			&video.Status,
+			&video.IsPrivate,
 			&video.CreatedAt,
 			&video.UpdatedAt,
 		)
@@ -98,7 +100,7 @@ func (r *VideoRepository) FindByUserIDPaginated(userID uuid.UUID, page, pageSize
 
 func (r *VideoRepository) FindByID(id uuid.UUID) (*model.Video, error) {
 	query := `
-		SELECT id, title, description, file_path, file_size, duration, thumbnail_path, user_id, status, created_at, updated_at
+		SELECT id, title, description, file_path, file_size, duration, thumbnail_path, user_id, status, is_private, created_at, updated_at
 		FROM videos
 		WHERE id = $1
 	`
@@ -135,6 +137,7 @@ func (r *VideoRepository) FindByID(id uuid.UUID) (*model.Video, error) {
 		&video.ThumbnailPath,
 		&video.UserID,
 		&video.Status,
+		&video.IsPrivate,
 		&video.CreatedAt,
 		&video.UpdatedAt,
 	)
@@ -175,7 +178,7 @@ func (r *VideoRepository) UpdateThumbnail(videoID uuid.UUID, thumbnailPath strin
 	return err
 }
 
-func (r *VideoRepository) UpdateMetadata(videoID uuid.UUID, title *string, description *string) error {
+func (r *VideoRepository) UpdateMetadata(videoID uuid.UUID, title *string, description *string, isPrivate *bool) error {
 	updates := []string{}
 	args := []interface{}{}
 	argPos := 1
@@ -192,6 +195,12 @@ func (r *VideoRepository) UpdateMetadata(videoID uuid.UUID, title *string, descr
 		argPos++
 	}
 
+	if isPrivate != nil {
+		updates = append(updates, "is_private = $"+strconv.Itoa(argPos))
+		args = append(args, *isPrivate)
+		argPos++
+	}
+
 	if len(updates) == 0 {
 		return nil
 	}
@@ -202,9 +211,9 @@ func (r *VideoRepository) UpdateMetadata(videoID uuid.UUID, title *string, descr
 	return err
 }
 
-func (r *VideoRepository) FindAllPaginatedWithSearch(query string, userID *uuid.UUID, page, pageSize int) ([]model.Video, error) {
+func (r *VideoRepository) FindAllPaginatedWithSearch(query string, userID *uuid.UUID, currentUserID *uuid.UUID, page, pageSize int) ([]model.Video, error) {
 	base := `
-		SELECT id, title, description, file_path, file_size, duration, thumbnail_path, user_id, status, created_at, updated_at
+		SELECT id, title, description, file_path, file_size, duration, thumbnail_path, user_id, status, is_private, created_at, updated_at
 		FROM videos
 	`
 	where := ""
@@ -221,10 +230,28 @@ func (r *VideoRepository) FindAllPaginatedWithSearch(query string, userID *uuid.
 		argPos++
 	}
 
+	// Добавляем фильтр приватности (если нужно)
+	if userID == nil {
+		// Если не фильтруем по конкретному пользователю, применяем фильтр приватности
+		if currentUserID != nil {
+			// Показываем публичные ИЛИ приватные видео текущего пользователя
+			addCond("(is_private = FALSE OR (is_private = TRUE AND user_id = $"+strconv.Itoa(argPos)+"))", *currentUserID)
+		} else {
+			// Если пользователь не авторизован, показываем только публичные
+			if where == "" {
+				where = "WHERE is_private = FALSE"
+			} else {
+				where += " AND is_private = FALSE"
+			}
+		}
+	}
+	// Если userID != nil, показываем все видео этого пользователя (и приватные, и публичные)
+	
 	if query != "" {
 		addCond("(title ILIKE $"+strconv.Itoa(argPos)+" OR description ILIKE $"+strconv.Itoa(argPos)+")", "%"+query+"%")
 	}
 	if userID != nil {
+		// Если фильтруем по конкретному пользователю, показываем все его видео (и приватные, и публичные)
 		addCond("user_id = $"+strconv.Itoa(argPos), *userID)
 	}
 
@@ -257,6 +284,7 @@ func (r *VideoRepository) FindAllPaginatedWithSearch(query string, userID *uuid.
 			&video.ThumbnailPath,
 			&video.UserID,
 			&video.Status,
+			&video.IsPrivate,
 			&video.CreatedAt,
 			&video.UpdatedAt,
 		); err != nil {

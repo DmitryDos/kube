@@ -186,10 +186,6 @@ struct SearchView: View {
     }
     
     private func showVideoInfo(_ track: Track) {
-        // Создаем копию трека с обновленным URL для модалки
-//        let baseURL = AppConfig.apiBaseURL
-//        let proxyURL = "\(baseURL)/api/videos/\(track.id)/stream/proxy"
-
         ModalProvider.shared.show(ShowTrackInfoModal(track: track, isReadOnly: true))
     }
     

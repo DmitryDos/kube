@@ -69,7 +69,13 @@ func (h *SearchHandler) SearchVideosAndAuthors(c *gin.Context) {
 
 	case "videos":
 		// Только видео
-		videos, err := h.videoService.GetAllVideosPaginated(q, nil, page-1, limit)
+		var currentUserID *uuid.UUID
+		if uid, ok := c.Get("userID"); ok {
+			if v, ok2 := uid.(uuid.UUID); ok2 {
+				currentUserID = &v
+			}
+		}
+		videos, err := h.videoService.GetAllVideosPaginated(q, nil, currentUserID, page-1, limit)
 		if err != nil {
 			log.Printf("[SearchHandler] Error searching videos: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search videos"})
@@ -95,7 +101,13 @@ func (h *SearchHandler) SearchVideosAndAuthors(c *gin.Context) {
 
 	default:
 		// Все результаты (и видео, и авторы)
-		videos, err := h.videoService.GetAllVideosPaginated(q, nil, page-1, limit)
+		var currentUserID *uuid.UUID
+		if uid, ok := c.Get("userID"); ok {
+			if v, ok2 := uid.(uuid.UUID); ok2 {
+				currentUserID = &v
+			}
+		}
+		videos, err := h.videoService.GetAllVideosPaginated(q, nil, currentUserID, page-1, limit)
 		if err != nil {
 			log.Printf("[SearchHandler] Error searching videos: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search videos"})

@@ -2,8 +2,6 @@ import SwiftUI
 
 struct PlaylistsView: View {
     @StateObject private var playlistService = PlaylistService.shared
-    @StateObject private var trackController = TrackController.shared
-    @ObservedObject private var queueService = QueueService.shared
     @ObservedObject private var themeObserver = ThemeObserver.shared
     @Environment(\.isLandscape) private var isLandscape
     @State private var searchText: String = ""
@@ -12,11 +10,14 @@ struct PlaylistsView: View {
     @State private var editingPlaylistID: UUID? = nil
     @State private var selectedTracks: Set<UUID> = []
     @State private var tempPlaylistName: String = ""
+    @State private var editingPlaylistTracks: [Track] = []
 
-    private var editingPlaylistTracks: [Track] {
-        guard let playlistID = editingPlaylistID else { return [] }
-        let allTracks = trackController.tracks
-        return allTracks.filter { selectedTracks.contains($0.id) }
+    private func updateEditingPlaylistTracks() {
+        guard editingPlaylistID != nil else {
+            editingPlaylistTracks = []
+            return
+        }
+        editingPlaylistTracks = playlistService.getTracksForEditing(selectedTrackIds: selectedTracks)
     }
 
     var body: some View {
@@ -49,31 +50,20 @@ struct PlaylistsView: View {
             return playlist.name.lowercased().contains(searchLowercased)
         }
     }
-    
-    private func filteredTracksForAllMusic() -> [Track] {
-        return trackController.tracks
-    }
-    
+
     private func getTracksForPlaylist(_ playlist: Playlist) -> [Track] {
         if playlist.id == editingPlaylistID {
             return editingPlaylistTracks
         }
         
-        let tracks: [Track]
+        var tracks = playlistService.getTracksForPlaylist(playlist.id)
         
-        if playlist.id == PlaylistService.likedPlaylistID {
-            tracks = playlistService.getTracksForPlaylist(playlist.id)
-            if !searchText.isEmpty {
-                let searchLowercased = searchText.lowercased()
-                return tracks.filter { track in
-                    track.title.lowercased().contains(searchLowercased) ||
-                    track.desc.lowercased().contains(searchLowercased)
-                }
-            } else {
-                return tracks
+        if !searchText.isEmpty {
+            let searchLowercased = searchText.lowercased()
+            tracks = tracks.filter { track in
+                track.title.lowercased().contains(searchLowercased) ||
+                track.desc.lowercased().contains(searchLowercased)
             }
-        } else {
-            tracks = playlistService.getTracksForPlaylist(playlist.id)
         }
         
         return tracks
@@ -106,7 +96,7 @@ struct PlaylistsView: View {
                     triggerServerSearchNow()
                 },
                 onClear: {
-                    trackController.loadFirstPage(query: nil)
+                    playlistService.searchTracks(query: nil) { _ in }
                 }
             )
             
@@ -125,10 +115,8 @@ struct PlaylistsView: View {
 
     private func triggerServerSearchNow() {
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if q.isEmpty {
-            trackController.loadFirstPage(query: nil)
-        } else {
-            trackController.loadFirstPage(query: q)
+        playlistService.searchTracks(query: q.isEmpty ? nil : q) { _ in
+            updateEditingPlaylistTracks()
         }
     }
 
@@ -227,6 +215,7 @@ struct PlaylistsView: View {
             tempPlaylistName = playlist.name
             let currentTracks = playlistService.getTracksForPlaylist(playlistID)
             selectedTracks = Set(currentTracks.map { $0.id })
+            updateEditingPlaylistTracks()
         }
     }
     
@@ -251,8 +240,11 @@ struct PlaylistsView: View {
                 }
             }
             
-            let allTracks = trackController.tracks
-            let tracksToAdd = allTracks.filter { selectedTracks.contains($0.id) && !currentTracks.contains($0) }
+            let tracksToAdd = playlistService.getAvailableTracksForPlaylist(
+                playlistID: playlistID,
+                selectedTrackIds: selectedTracks,
+                currentTracks: currentTracks
+            )
             
             for track in tracksToAdd {
                 playlistService.addTrackToPlaylist(track: track, playlistID: playlistID)

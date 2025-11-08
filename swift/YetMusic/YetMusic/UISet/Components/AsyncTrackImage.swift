@@ -103,11 +103,8 @@ struct AsyncTrackImage: View {
     private func loadRemoteThumbnail(from url: URL) {
         print("[AsyncTrackImage] Loading thumbnail from: \(url.absoluteString)")
         
+        // Для просмотра thumbnail авторизация не требуется
         var request = URLRequest(url: url)
-        // Добавляем токен авторизации, если есть
-        if let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
         
         downloadTask = URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {

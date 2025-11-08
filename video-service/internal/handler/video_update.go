@@ -103,6 +103,7 @@ func (h *VideoHandler) UpdateVideoMetadata(c *gin.Context) {
                 ThumbnailURL: thumbnailURL,
                 Status:       video.Status,
                 Duration:     duration,
+                IsPrivate:    video.IsPrivate,
                 CreatedAt:    video.CreatedAt,
             },
         })

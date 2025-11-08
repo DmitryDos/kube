@@ -63,6 +63,7 @@ func (s *VideoService) CreateVideoFile(userID uuid.UUID, fileHeader *model.FileH
         ThumbnailPath: sql.NullString{},
         UserID:       userID,
         Status:       "ready",
+        IsPrivate:    false, // По умолчанию видео публичное
     }
 
     if err := s.repo.Create(video); err != nil {
@@ -111,6 +112,7 @@ func (s *VideoService) GetUserVideosPaginated(userID uuid.UUID, page, pageSize i
             ThumbnailURL: thumbnailURL,
             Status:       video.Status,
             Duration:     duration,
+            IsPrivate:    video.IsPrivate,
             CreatedAt:    video.CreatedAt,
         })
     }
@@ -118,8 +120,8 @@ func (s *VideoService) GetUserVideosPaginated(userID uuid.UUID, page, pageSize i
     return response, nil
 }
 
-func (s *VideoService) GetAllVideosPaginated(query string, userID *uuid.UUID, page, pageSize int) ([]model.VideoResponse, error) {
-    videos, err := s.repo.FindAllPaginatedWithSearch(query, userID, page, pageSize)
+func (s *VideoService) GetAllVideosPaginated(query string, userID *uuid.UUID, currentUserID *uuid.UUID, page, pageSize int) ([]model.VideoResponse, error) {
+    videos, err := s.repo.FindAllPaginatedWithSearch(query, userID, currentUserID, page, pageSize)
     if err != nil {
         return nil, err
     }
@@ -153,6 +155,7 @@ func (s *VideoService) GetAllVideosPaginated(query string, userID *uuid.UUID, pa
             ThumbnailURL: thumbnailURL,
             Status:       video.Status,
             Duration:     duration,
+            IsPrivate:    video.IsPrivate,
             CreatedAt:    video.CreatedAt,
         })
     }
@@ -250,6 +253,7 @@ func (s *VideoService) CreateVideoStream(userID uuid.UUID, reader io.Reader, fil
         ThumbnailPath: sql.NullString{},
         UserID:       userID,
         Status:       "ready",
+        IsPrivate:    false, // По умолчанию видео публичное
     }
 
     if err := s.repo.Create(video); err != nil {
@@ -269,7 +273,7 @@ func (s *VideoService) UpdateVideoMetadata(userID, videoID uuid.UUID, req *model
     if video.UserID != userID {
         return errors.New("video not found or access denied")
     }
-    return s.repo.UpdateMetadata(videoID, req.Title, req.Description)
+    return s.repo.UpdateMetadata(videoID, req.Title, req.Description, req.IsPrivate)
 }
 
 func (s *VideoService) UpdateVideoThumbnail(userID, videoID uuid.UUID, fileHeader *model.FileHeader) error {

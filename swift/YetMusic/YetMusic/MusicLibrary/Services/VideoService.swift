@@ -34,11 +34,7 @@ class VideoService: ObservableObject {
         return URLSession(configuration: config)
     }()
     
-    @Published var videos: [Track] = []
-    
-    private init() {
-        // Убираем loadVideos() из init, т.к. теперь требуется пагинация
-    }
+    private init() {}
 
     struct StreamURLResponse: Codable { let url: String }
 
@@ -151,106 +147,6 @@ class VideoService: ObservableObject {
     private func getToken() -> String? {
         UserDefaults.standard.string(forKey: tokenKey)
     }
-    
-    func loadVideos(page: Int = 0, pageSize: Int = 20, query: String? = nil, userId: Int? = nil, mine: Bool = false, completion: @escaping ([Track]) -> Void) {
-        guard let token = getToken() else {
-            completion([])
-            return
-        }
-        
-        var params = ["page=\(page)", "limit=\(pageSize)"]
-        if let q = query, !q.isEmpty, let encoded = q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
-            params.append("q=\(encoded)")
-        }
-        if mine {
-            params.append("mine=true")
-        } else if let userId = userId {
-            params.append("user_id=\(userId)")
-        }
-        let endpoint = "/api/videos/all?" + params.joined(separator: "&")
-
-        makeRequest(
-            endpoint: endpoint,
-            method: "GET",
-            token: token
-        ) { (result: Result<VideoResponse, Error>) in
-            switch result {
-            case .success(let response):
-                print("[VideoService] Loaded videos count: \(response.videos.count)")
-                completion(response.videos)
-            case .failure:
-                print("[VideoService] Failed to load videos")
-                completion([])
-            }
-        }
-    }
-    
-    private func makeRequest<T: Decodable>(
-        endpoint: String,
-        method: String,
-        body: Encodable? = nil,
-        token: String? = nil,
-        completion: @escaping (Result<T, Error>) -> Void
-    ) {
-        guard let url = URL(string: baseURL + endpoint) else {
-            completion(.failure(VideoError.invalidURL))
-            return
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = method
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let token = token {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        if let body = body {
-            do {
-                request.httpBody = try JSONEncoder().encode(body)
-            } catch {
-                completion(.failure(error))
-                return
-            }
-        }
-        
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let error = error {
-                completion(.failure(error))
-                return
-            }
-            
-            guard let httpResponse = response as? HTTPURLResponse else {
-                completion(.failure(VideoError.invalidResponse))
-                return
-            }
-            
-            guard (200...299).contains(httpResponse.statusCode) else {
-                if let data = data, let raw = String(data: data, encoding: .utf8) {
-                    print("[VideoService] Server error (\(httpResponse.statusCode)): \n\(raw)")
-                }
-                let statusError = VideoError.serverError(statusCode: httpResponse.statusCode)
-                completion(.failure(statusError))
-                return
-            }
-            
-            guard let data = data else {
-                completion(.failure(VideoError.noData))
-                return
-            }
-            
-            do {
-                let decoder = makeDecoder()
-                let decodedResponse = try decoder.decode(T.self, from: data)
-                completion(.success(decodedResponse))
-            } catch {
-                if let raw = String(data: data, encoding: .utf8) {
-                    print("[VideoService] Decode error: \(error)\nRaw: \n\(raw)")
-                }
-                completion(.failure(error))
-            }
-        }.resume()
-    }
 }
 
 extension Data {
@@ -261,7 +157,6 @@ extension Data {
     }
 }
 
-// MARK: - Decoder helper
 private func makeDecoder() -> JSONDecoder {
     let decoder = JSONDecoder()
     decoder.dateDecodingStrategy = .custom { decoder in
