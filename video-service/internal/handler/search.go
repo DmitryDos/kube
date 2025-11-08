@@ -8,6 +8,7 @@ import (
 	"video-service/internal/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 type SearchHandler struct {
