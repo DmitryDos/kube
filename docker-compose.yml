@@ -107,7 +107,8 @@ services:
 
   video-service-bff:
     build:
-      context: ./frontend/services/video-service-bff
+      context: ./frontend
+      dockerfile: ./services/video-service-bff/Dockerfile
     container_name: video-service-bff
     ports:
       - "3002:3002"
@@ -123,7 +124,8 @@ services:
 
   auth-service-bff:
     build:
-      context: ./frontend/services/auth-service-bff
+      context: ./frontend
+      dockerfile: ./services/auth-service-bff/Dockerfile
     container_name: auth-service-bff
     ports:
       - "3003:3003"
@@ -140,7 +142,8 @@ services:
 
   video-service-ssr:
     build:
-      context: ./frontend/services/video-service-ssr
+      context: ./frontend
+      dockerfile: ./services/video-service-ssr/Dockerfile
     container_name: video-service-ssr
     ports:
       - "3000:3000"
