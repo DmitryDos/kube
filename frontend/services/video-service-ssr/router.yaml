@@ -1,0 +1,20 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: video-service-web
+  namespace: default
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`video.example.com`)
+      kind: Rule
+      services:
+        - name: video-service-web
+          port: 3002
+      middlewares:
+        - name: default-headers
+  tls:
+    secretName: video-service-web-tls
+

@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "strict": true,
+
+    "incremental": true,
+    "esModuleInterop": true,
+
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+
+    "noUnusedLocals": true,
+    "noFallthroughCasesInSwitch": true,
+
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "noEmitOnError": true,
+    "noEmit": true,
+    "resolveJsonModule": true,
+
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noUnusedParameters": true,
+    "noPropertyAccessFromIndexSignature": true
+  }
+}

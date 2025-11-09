@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.bff.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "baseUrl": "./",
+    "noEmit": false,
+    "module": "commonjs",
+    "target": "ES2021",
+    "lib": ["ES2021"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
+

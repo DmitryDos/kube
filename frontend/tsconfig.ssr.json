@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "_version": "2.0.0",
+
+  "extends": "./tsconfig.checks.json",
+  "compilerOptions": {
+    "module": "esnext",
+    "target": "esnext",
+    "moduleResolution": "bundler",
+
+    "jsx": "preserve",
+    "lib": ["dom", "ESNext"],
+
+    "isolatedModules": true,
+    "allowJs": true,
+
+    "plugins": [
+      {
+        "name": "next"
+      },
+      {
+        "name": "typescript-plugin-css-modules",
+        "options": {
+          "goToDefinition": true
+        }
+      }
+    ]
+  },
+  "ts-node": {
+    "experimentalResolver": true,
+    "swc": true
+  }
+}

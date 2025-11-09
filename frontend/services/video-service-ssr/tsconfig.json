@@ -1,0 +1,6 @@
+{
+  "extends": "../../tsconfig.ssr.json",
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/types/css-modules.d.ts"],
+  "exclude": ["node_modules"]
+}
+

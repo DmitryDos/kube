@@ -105,6 +105,56 @@ services:
     volumes:
       - minio_data:/data
 
+  video-service-bff:
+    build:
+      context: ./frontend/services/video-service-bff
+    container_name: video-service-bff
+    ports:
+      - "3002:3002"
+    env_file:
+      - .env
+    environment:
+      API_BASE_URL: ${API_BASE_URL:-http://api-gateway:80}
+      PORT: 3002
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    depends_on:
+      - api-gateway
+    restart: on-failure
+
+  auth-service-bff:
+    build:
+      context: ./frontend/services/auth-service-bff
+    container_name: auth-service-bff
+    ports:
+      - "3003:3003"
+    env_file:
+      - .env
+    environment:
+      API_BASE_URL: ${API_BASE_URL:-http://api-gateway:80}
+      PORT: 3003
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      NODE_ENV: ${NODE_ENV:-production}
+    depends_on:
+      - api-gateway
+    restart: on-failure
+
+  video-service-ssr:
+    build:
+      context: ./frontend/services/video-service-ssr
+    container_name: video-service-ssr
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      VIDEO_BFF_URL: http://video-service-bff:3002
+      AUTH_BFF_URL: http://auth-service-bff:3003
+      NODE_ENV: production
+    depends_on:
+      - video-service-bff
+      - auth-service-bff
+    restart: on-failure
+
 volumes:
   postgres_data:
   minio_data:
