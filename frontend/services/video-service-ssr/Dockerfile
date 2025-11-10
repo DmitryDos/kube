@@ -23,7 +23,15 @@ WORKDIR /app/services/video-service-ssr
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN pnpm run build
 
+# Copy static files to standalone directory (required for standalone mode)
+# The standalone server expects .next/static to be accessible
+RUN mkdir -p .next/standalone/.next && \
+    cp -r .next/static .next/standalone/.next/static
+
 EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
-CMD ["node", ".next/standalone/server.js"]
+
+# Run from the standalone directory
+WORKDIR /app/services/video-service-ssr/.next/standalone
+CMD ["node", "server.js"]

@@ -146,7 +146,7 @@ services:
       dockerfile: ./services/video-service-ssr/Dockerfile
     container_name: video-service-ssr
     ports:
-      - "3000:3000"
+      - "3004:3004"
     env_file:
       - .env
     environment:
