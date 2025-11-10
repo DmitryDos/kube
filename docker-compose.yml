@@ -3,6 +3,12 @@ services:
     build: ./api-gateway
     ports:
       - "8080:80"
+    env_file:
+      - .env
+    environment:
+      # ALLOWED_ORIGIN должен быть установлен в .env файле
+      # Например: ALLOWED_ORIGIN=http://51.250.34.223:3004
+      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN}
     depends_on:
       auth-service:
         condition: service_started
@@ -29,11 +35,29 @@ services:
       timeout: 5s
       retries: 5
 
+  db-migrate:
+    image: postgres:15
+    container_name: db-migrate
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-video_platform}
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password123}
+      POSTGRES_HOST: postgres
+    volumes:
+      - ./postgres/migrations:/migrations:ro
+      - ./postgres/apply-migrations.sh:/apply-migrations.sh:ro
+    command: /bin/bash /apply-migrations.sh
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   auth-service:
     build: ./auth-service
     container_name: auth-service
-    ports:
-      - "3000:3000"
+    # Порт не пробрасываем - доступен только через API Gateway
     env_file:
       - .env
     environment:
@@ -49,13 +73,14 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
 
   video-service:
     build: ./video-service
-    ports:
-      - "3001:3001"
+    # Порт не пробрасываем - доступен только через API Gateway
     env_file:
       - .env
     environment:
@@ -72,6 +97,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       minio:
         condition: service_started
     volumes:
@@ -110,8 +137,7 @@ services:
       context: ./frontend
       dockerfile: ./services/video-service-bff/Dockerfile
     container_name: video-service-bff
-    ports:
-      - "3002:3002"
+    # Порт не пробрасываем - доступен только через API Gateway
     env_file:
       - .env
     environment:
@@ -127,8 +153,7 @@ services:
       context: ./frontend
       dockerfile: ./services/auth-service-bff/Dockerfile
     container_name: auth-service-bff
-    ports:
-      - "3003:3003"
+    # Порт не пробрасываем - доступен только через API Gateway
     env_file:
       - .env
     environment:
@@ -145,14 +170,14 @@ services:
       context: ./frontend
       dockerfile: ./services/video-service-ssr/Dockerfile
     container_name: video-service-ssr
-    ports:
-      - "3004:3004"
+    # Порт не пробрасываем наружу - доступен только через API Gateway
+    # Это обеспечивает same origin для всех запросов
     env_file:
       - .env
     environment:
       VIDEO_BFF_URL: http://video-service-bff:3002
       AUTH_BFF_URL: http://auth-service-bff:3003
-      NEXT_PUBLIC_API_BASE_URL: http://51.250.34.223:8080
+      API_BASE_URL: http://api-gateway:80
       NODE_ENV: production
     depends_on:
       - video-service-bff

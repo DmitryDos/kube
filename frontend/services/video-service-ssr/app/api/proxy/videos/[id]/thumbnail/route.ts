@@ -7,7 +7,9 @@ export async function GET(
   { params }: { params: PageParams<{ id: string }> }
 ) {
   const { id: videoId } = await params;
-  const apiBaseUrl = process.env['NEXT_PUBLIC_API_BASE_URL'] || 'http://158.160.192.60:8080';
+  // Используем API Gateway через переменную окружения или относительный путь
+  // В Docker Compose API Gateway доступен как http://api-gateway:80
+  const apiBaseUrl = process.env['API_BASE_URL'] || 'http://api-gateway:80';
   
   // Get auth token from cookies
   const cookieStore = await cookies();

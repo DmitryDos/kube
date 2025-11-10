@@ -38,8 +38,8 @@ export class Video {
   @Field({ nullable: true })
   description?: string;
 
-  @Field()
-  thumbnail_url!: string;
+  @Field({ nullable: true })
+  thumbnail_url?: string;
 
   @Field(() => Int)
   duration!: number;

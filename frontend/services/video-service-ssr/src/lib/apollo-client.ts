@@ -6,8 +6,9 @@ import { onError } from '@apollo/client/link/error';
 import { useMemo } from 'react';
 
 function createClient(uri: string) {
+  // URI уже содержит полный путь (например, /graphql/auth или /graphql/video)
   const httpLink = new HttpLink({
-    uri: `${uri}/graphql`,
+    uri: uri,
     credentials: 'include',
   });
 
@@ -55,12 +56,21 @@ function createClient(uri: string) {
 }
 
 export function useApolloClients() {
-  const authBffUrl = process.env['NEXT_PUBLIC_AUTH_BFF_URL'] || 'http://localhost:3003';
-  const videoBffUrl = process.env['NEXT_PUBLIC_VIDEO_BFF_URL'] || 'http://localhost:3002';
-
-  return useMemo(() => ({
-    auth: createClient(authBffUrl),
-    video: createClient(videoBffUrl),
-  }), [authBffUrl, videoBffUrl]);
+  // SSR доступен только через API Gateway, поэтому используем относительные пути
+  // Все запросы идут через API Gateway - same origin, CORS не нужен
+  // API Gateway проксирует GraphQL запросы:
+  // /graphql/auth -> auth-service-bff/graphql
+  // /graphql/video -> video-service-bff/graphql
+  
+  return useMemo(() => {
+    // Относительные пути - same origin через API Gateway
+    const authGraphQLUrl = '/graphql/auth';
+    const videoGraphQLUrl = '/graphql/video';
+    
+    return {
+      auth: createClient(authGraphQLUrl),
+      video: createClient(videoGraphQLUrl),
+    };
+  }, []);
 }
 
