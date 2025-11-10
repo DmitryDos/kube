@@ -4,18 +4,18 @@ RUN corepack enable && corepack prepare pnpm@latest --activate
 
 WORKDIR /app
 
-# Copy workspace files
+# Copy only workspace config files (needed for pnpm workspace)
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
-COPY services/video-service-bff/package.json ./services/video-service-bff/
-COPY services/auth-service-bff/package.json ./services/auth-service-bff/
-COPY services/video-service-ssr/package.json ./services/video-service-ssr/
 COPY tsconfig.*.json ./
 
-# Install dependencies
-RUN --mount=type=cache,target=/root/.pnpm-store \
-    pnpm install --frozen-lockfile
+# Copy only auth-service-bff package.json (we only need this service)
+COPY services/auth-service-bff/package.json ./services/auth-service-bff/
 
-# Copy source code
+# Install dependencies only for auth-service-bff using pnpm filter
+RUN --mount=type=cache,target=/root/.pnpm-store \
+    pnpm install --frozen-lockfile --filter ./services/auth-service-bff
+
+# Copy source code only for auth-service-bff
 COPY services/auth-service-bff ./services/auth-service-bff
 
 # Build

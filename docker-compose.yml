@@ -117,7 +117,7 @@ services:
     environment:
       API_BASE_URL: ${API_BASE_URL:-http://api-gateway:80}
       PORT: 3002
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3004}
     depends_on:
       - api-gateway
     restart: on-failure
@@ -134,7 +134,7 @@ services:
     environment:
       API_BASE_URL: ${API_BASE_URL:-http://api-gateway:80}
       PORT: 3003
-      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3004}
       NODE_ENV: ${NODE_ENV:-production}
     depends_on:
       - api-gateway
@@ -152,6 +152,7 @@ services:
     environment:
       VIDEO_BFF_URL: http://video-service-bff:3002
       AUTH_BFF_URL: http://auth-service-bff:3003
+      NEXT_PUBLIC_API_BASE_URL=http://51.250.34.223:8080
       NODE_ENV: production
     depends_on:
       - video-service-bff
