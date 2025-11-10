@@ -99,8 +99,8 @@ export function VideoPlaybackProvider({ children }: { children: ReactNode }) {
     // Проверяем, активен ли PIP ДО переключения видео
     const pipActive = !!document.pictureInPictureElement;
     
-    // Формируем URL синхронно
-    const videoUrl = `/api/proxy/videos/${videoId}/stream/proxy`;
+    // Формируем URL синхронно - напрямую через API Gateway (быстрее)
+    const videoUrl = `/api/videos/${videoId}/stream/proxy`;
     
     // Устанавливаем src (как в Swift: replaceCurrentItem)
     const currentSrc = video.src ? video.src.split('?')[0] : '';
@@ -179,8 +179,8 @@ export function VideoPlaybackProvider({ children }: { children: ReactNode }) {
     setCurrentVideoId(videoId);
     setCurrentVideoData(videoData || null);
     
-    // Формируем URL синхронно
-    const videoUrl = `/api/proxy/videos/${videoId}/stream/proxy`;
+    // Формируем URL синхронно - напрямую через API Gateway (быстрее)
+    const videoUrl = `/api/videos/${videoId}/stream/proxy`;
     
     // Устанавливаем src
     const currentSrc = video.src ? video.src.split('?')[0] : '';

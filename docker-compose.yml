@@ -141,10 +141,13 @@ services:
     env_file:
       - .env
     environment:
+      # Прямой доступ к video-service для ускорения (минуя API Gateway)
+      VIDEO_SERVICE_URL: http://video-service:3001
       API_BASE_URL: ${API_BASE_URL:-http://api-gateway:80}
       PORT: 3002
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3004}
     depends_on:
+      - video-service
       - api-gateway
     restart: on-failure
 

@@ -15,7 +15,6 @@ interface PlayerBlockProps {
 
 export function PlayerBlock({ videoId, isExpanded, onToggle }: PlayerBlockProps) {
   const { getVideoStreamURL } = useVideoStream();
-  const { getVideo } = useVideo();
   
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [currentVideo, setCurrentVideo] = useState<Video | null>(null);
@@ -51,6 +50,8 @@ export function PlayerBlock({ videoId, isExpanded, onToggle }: PlayerBlockProps)
     };
   }, []);
 
+  // Метаданные видео должны передаваться из результатов search, а не запрашиваться заново
+  // Если videoId изменился, нужно только получить stream URL
   useEffect(() => {
     if (!videoId) {
       setVideoUrl(null);
@@ -58,21 +59,20 @@ export function PlayerBlock({ videoId, isExpanded, onToggle }: PlayerBlockProps)
       return;
     }
 
-    const loadVideo = async () => {
+    // Получаем только stream URL - метаданные уже есть в результатах search
+    const loadStreamUrl = async () => {
       try {
-        const [videoData, streamUrl] = await Promise.all([
-          getVideo(videoId),
-          getVideoStreamURL(videoId)
-        ]);
-        setCurrentVideo(videoData);
+        const streamUrl = await getVideoStreamURL(videoId);
         setVideoUrl(streamUrl);
+        // Метаданные должны быть переданы через пропсы или из контекста
+        // Если их нет, оставляем null - они придут из search результатов
       } catch (err) {
-        console.error('Failed to load video:', err);
+        console.error('Failed to load stream URL:', err);
       }
     };
 
-    loadVideo();
-  }, [videoId, getVideoStreamURL, getVideo]);
+    loadStreamUrl();
+  }, [videoId, getVideoStreamURL]);
 
   useEffect(() => {
     const video = playerVideoRef.current;

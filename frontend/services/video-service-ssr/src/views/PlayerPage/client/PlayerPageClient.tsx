@@ -13,38 +13,49 @@ import styles from './PlayerPageClient.module.css';
 
 interface PlayerPageClientProps {
   videoId: string;
+  videoData?: Video; // Метаданные видео (если уже получены из search)
 }
 
-export function PlayerPageClient({ videoId }: PlayerPageClientProps) {
+export function PlayerPageClient({ videoId, videoData }: PlayerPageClientProps) {
   const router = useRouter();
   const { getVideo } = useVideo();
   const { getVideoStreamURL } = useVideoStream();
   const { playVideoWithTime } = useVideoPlayback();
-  const [video, setVideo] = useState<Video | null>(null);
+  const [video, setVideo] = useState<Video | null>(videoData || null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const localVideoRef = useRef<HTMLVideoElement | null>(null);
 
+  // Обновляем video если videoData изменился
   useEffect(() => {
-    const loadVideo = async () => {
+    if (videoData) {
+      setVideo(videoData);
+    }
+  }, [videoData]);
+
+  useEffect(() => {
+    const loadStreamUrl = async () => {
       if (!videoId) return;
 
       setIsLoading(true);
       setError(null);
 
       try {
-        const videoData = await getVideo(videoId);
-        
-        if (!videoData) {
-          setError('Видео не найдено');
-          setIsLoading(false);
-          return;
-        }
-
-        setVideo(videoData);
+        // Получаем только stream URL - метаданные должны быть переданы через пропсы
         const streamUrl = await getVideoStreamURL(videoId);
         setVideoUrl(streamUrl);
+        
+        // Если videoData не передан, делаем fallback запрос (но это должно быть редко)
+        if (!video && !videoData) {
+          const fetchedVideo = await getVideo(videoId);
+          if (!fetchedVideo) {
+            setError('Видео не найдено');
+            setIsLoading(false);
+            return;
+          }
+          setVideo(fetchedVideo);
+        }
       } catch (err) {
         console.error('Error loading video:', err);
         setError('Не удалось загрузить видео');
@@ -53,8 +64,8 @@ export function PlayerPageClient({ videoId }: PlayerPageClientProps) {
       }
     };
 
-    loadVideo();
-  }, [videoId, getVideo, getVideoStreamURL]);
+    loadStreamUrl();
+  }, [videoId, getVideoStreamURL, getVideo, video, videoData]);
 
   // Устанавливаем URL для локального видео элемента
   useEffect(() => {

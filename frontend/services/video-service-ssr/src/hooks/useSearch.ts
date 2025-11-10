@@ -1,11 +1,8 @@
 import { useState, useCallback } from 'react';
 import { SearchResponse, SearchFilter } from '../types';
-import { useApolloClients } from '../lib/apollo-client';
-import { SEARCH_QUERY } from '../lib/graphql-queries';
-import { gql } from '@apollo/client';
 
+// Используем REST API напрямую, как Swift - быстрее чем через GraphQL (минуем video-service-bff)
 export function useSearch() {
-  const clients = useApolloClients();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,42 +17,37 @@ export function useSearch() {
       setError(null);
 
       try {
-        const { data } = await clients.video.query({
-          query: gql(SEARCH_QUERY),
-          variables: {
-            query,
-            page,
-            limit,
-            filter,
-          },
-          fetchPolicy: 'network-only',
+        // Идем напрямую к REST API через API Gateway (same origin)
+        // Это быстрее, чем через GraphQL (минуем video-service-bff)
+        const params = new URLSearchParams({
+          q: query || '',
+          page: page.toString(),
+          limit: limit.toString(),
+          filter: filter === 'all' ? 'all' : filter,
         });
+
+        const response = await fetch(`/api/search?${params.toString()}`, {
+          method: 'GET',
+          credentials: 'include', // Для передачи cookies с токеном
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Search failed: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
         
-        // Transform GraphQL response to expected format
-        const searchData = data.search;
+        // API Gateway возвращает: { results: [{ type: "video", data: {...} }], pagination: {...} }
+        // Формат уже правильный, просто возвращаем как есть
         return {
-          results: searchData.results.map((item: any) => {
-            const itemData = item.video || item.author;
-            // Ensure author has all required fields
-            if (item.type === 'author' && itemData) {
-              return {
-                type: item.type,
-                data: {
-                  ...itemData,
-                  title: itemData.title || itemData.name,
-                  name: itemData.name || itemData.title,
-                },
-              };
-            }
-            return {
-              type: item.type,
-              data: itemData,
-            };
-          }),
-          pagination: {
-            page: searchData.page || 1,
-            limit: searchData.limit || 20,
-            total: searchData.total || 0,
+          results: data.results || [],
+          pagination: data.pagination || {
+            page: data.page || 1,
+            limit: data.limit || 20,
+            total: data.total || 0,
           },
         };
       } catch (err) {
@@ -66,7 +58,7 @@ export function useSearch() {
         setIsLoading(false);
       }
     },
-    [clients]
+    []
   );
 
   return { search, isLoading, error };

@@ -1,11 +1,8 @@
 import { useState, useCallback } from 'react';
 import { Video } from '../types';
-import { useApolloClients } from '../lib/apollo-client';
-import { SEARCH_QUERY } from '../lib/graphql-queries';
-import { gql } from '@apollo/client';
 
+// Используем REST API напрямую - быстрее чем GraphQL с limit=100
 export function useVideo() {
-  const clients = useApolloClients();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -15,22 +12,36 @@ export function useVideo() {
       setError(null);
 
       try {
-        const { data } = await clients.video.query({
-          query: gql(SEARCH_QUERY),
-          variables: {
-            query: '',
-            page: 1,
-            limit: 100,
-            filter: 'videos',
-          },
-          fetchPolicy: 'network-only',
+        // TODO: Добавить REST endpoint /api/videos/:id для получения одного видео
+        // Пока используем search с большим limit и ищем по ID в результатах
+        // Это быстрее, чем GraphQL запрос на 100 видео, но не идеально
+        const params = new URLSearchParams({
+          q: '', // Пустой запрос - получаем все видео
+          page: '1',
+          limit: '100', // Достаточно для поиска по ID
+          filter: 'videos',
         });
+
+        const response = await fetch(`/api/search?${params.toString()}`, {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch video: ${response.status}`);
+        }
+
+        const data = await response.json();
         
-        const videoResult = data.search.results.find(
-          (item: any) => item.type === 'video' && item.video?.id === videoId
+        // Ищем видео с нужным ID в результатах
+        const videoResult = data.results?.find(
+          (item: any) => item.type === 'video' && item.data?.id === videoId
         );
 
-        return videoResult?.video || null;
+        return videoResult?.data || null;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Ошибка загрузки видео';
         setError(errorMessage);
@@ -39,7 +50,7 @@ export function useVideo() {
         setIsLoading(false);
       }
     },
-    [clients]
+    []
   );
 
   return { getVideo, isLoading, error };
