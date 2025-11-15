@@ -1,0 +1,29 @@
+/* src/components/VideoList/VideoList.module.css */
+.video-wrapper {
+  position: relative;
+}
+
+.video-edit-button {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  z-index: 10;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  border: none;
+  border-radius: 6px;
+  color: var(--accent-color);
+  cursor: pointer;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.video-wrapper:hover .video-edit-button {
+  opacity: 1;
+}
+

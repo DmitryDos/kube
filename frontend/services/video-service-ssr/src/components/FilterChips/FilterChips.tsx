@@ -1,11 +1,12 @@
+// src/components/FilterChips/FilterChips.tsx
 'use client';
 
 import { SearchFilter } from '../../types';
 import styles from './FilterChips.module.css';
 
 interface FilterChipsProps {
-  selected: SearchFilter;
-  onChange: (filter: SearchFilter) => void;
+  selectedFilter: SearchFilter;
+  onFilterChange: (filter: SearchFilter) => void;
 }
 
 const filters: { value: SearchFilter; label: string }[] = [
@@ -14,14 +15,15 @@ const filters: { value: SearchFilter; label: string }[] = [
   { value: 'authors', label: 'Авторы' },
 ];
 
-export default function FilterChips({ selected, onChange }: FilterChipsProps) {
+export function FilterChips({ selectedFilter, onFilterChange }: FilterChipsProps) {
   return (
-    <div className={styles['filterChips']}>
+    <div className={styles['filter-chips']}>
       {filters.map((filter) => (
         <button
           key={filter.value}
-          onClick={() => onChange(filter.value)}
-          className={`${styles['chip']} ${selected === filter.value ? styles['active'] : ''}`}
+          type="button"
+          className={`${styles['chip']} ${selectedFilter === filter.value ? styles['chip-selected'] : ''}`}
+          onClick={() => onFilterChange(filter.value)}
         >
           {filter.label}
         </button>

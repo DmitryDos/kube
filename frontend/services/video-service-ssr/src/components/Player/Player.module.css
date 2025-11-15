@@ -1,0 +1,83 @@
+/* src/components/Player/Player.module.css */
+.player {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: auto;
+}
+
+.video-section {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.video-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-width: 320px;
+  min-height: 180px;
+  aspect-ratio: 16 / 9;
+  background: var(--secondary-color);
+  border-radius: 8px;
+  gap: 16px;
+  color: var(--text-color);
+  opacity: 0.6;
+}
+
+.video-placeholder svg {
+  width: 64px;
+  height: 64px;
+}
+
+.video-placeholder p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 180px;
+  aspect-ratio: 16 / 9;
+  background: var(--secondary-color);
+  border-radius: 8px;
+  gap: 16px;
+  color: var(--text-color);
+  padding: 40px 20px;
+}
+
+.error svg {
+  width: 64px;
+  height: 64px;
+  color: #ff6b6b;
+  opacity: 0.8;
+}
+
+.error p {
+  margin: 0;
+  font-size: 14px;
+  text-align: center;
+  opacity: 0.8;
+  max-width: 400px;
+}
+
+.description-section {
+  flex-shrink: 0;
+  width: 100%;
+  height: auto;
+  margin-top: 12px;
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  min-height: 60px;
+}
+
+

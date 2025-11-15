@@ -1,134 +1,197 @@
-.playerContainer {
+/* src/components/VideoPlayer/VideoPlayer.module.css */
+.video-player-container {
   position: relative;
   width: 100%;
-  background: #000;
-  border-radius: 12px;
+  aspect-ratio: 16 / 9;
+  max-height: calc(100vh - 240px);
+  background: var(--background-color);
+  display: flex;
+  align-items: center;
+}
+
+.video-wrapper {
+  position: relative;
+  width: 100%;
+  max-height: calc(100vw / 16 * 9);
+  height: fit-content;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
   overflow: hidden;
 }
 
-.video {
-  width: 100%;
-  height: auto;
-  display: block;
+.video-wrapper::before {
+  content: '';
+  position: absolute;
+  inset: -20px;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 0.05) 0%, transparent 70%);
+  z-index: -1;
+  pointer-events: none;
 }
 
-.controls {
+.video {
+  max-height: 100%;
+  background: var(--background-color);
+}
+
+.controls-overlay {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  background: linear-gradient(to top, rgba(0, 0, 0, 0.9), transparent);
-  padding: 16px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, transparent 100%);
+  padding: 12px;
   opacity: 0;
-  transition: opacity 0.3s;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 10;
 }
 
-.playerContainer:hover .controls {
+.controls-overlay.controls-visible {
   opacity: 1;
+  pointer-events: all;
 }
 
-.controlsRow {
+.progress-container {
+  margin-bottom: 8px;
+}
+
+.progress-bar {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.buffered-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 3px;
+  pointer-events: none;
+}
+
+.progress-slider {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.progress-filled {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--accent-color);
+  border-radius: 3px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-}
-
-.controlsLeft,
-.controlsRight {
-  display: flex;
-  align-items: center;
   gap: 12px;
 }
 
-.progressBar {
-  margin-bottom: 12px;
-}
-
-.progressSlider {
-  width: 100%;
-  height: 6px;
-  -webkit-appearance: none;
-  appearance: none;
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 3px;
-  outline: none;
-  cursor: pointer;
-}
-
-.progressSlider::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  background: #4a9eff;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.progressSlider::-moz-range-thumb {
-  width: 14px;
-  height: 14px;
-  background: #4a9eff;
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-}
-
-.controlButton {
+.controls-left {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  color: #ffffff;
-  transition: opacity 0.2s;
+  gap: 8px;
+  flex: 1;
 }
 
-.controlButton:hover {
-  opacity: 0.8;
-}
-
-.timeDisplay {
-  color: #ffffff;
-  font-size: 14px;
-  font-weight: 500;
-  min-width: 100px;
-}
-
-.volumeControl {
+.controls-right {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.volumeSlider {
+.control-button {
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+  width: 32px;
+  height: 32px;
+}
+
+.control-button:hover {
+  opacity: 0.8;
+}
+
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.volume-slider {
   width: 80px;
   height: 4px;
-  -webkit-appearance: none;
-  appearance: none;
   background: rgba(255, 255, 255, 0.3);
   border-radius: 2px;
   outline: none;
   cursor: pointer;
+  -webkit-appearance: none;
 }
 
-.volumeSlider::-webkit-slider-thumb {
+.volume-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 12px;
   height: 12px;
-  background: #4a9eff;
+  background: var(--accent-color);
   border-radius: 50%;
   cursor: pointer;
 }
 
-.volumeSlider::-moz-range-thumb {
+.volume-slider::-moz-range-thumb {
   width: 12px;
   height: 12px;
-  background: #4a9eff;
-  border: none;
+  background: var(--accent-color);
   border-radius: 50%;
   cursor: pointer;
+  border: none;
+}
+
+.time-display {
+  color: var(--text-color);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  margin-left: 8px;
+}
+
+/* Media queries */
+@media (max-width: 768px) {
+  .controls {
+    gap: 8px;
+  }
+
+  .volume-control {
+    display: none;
+  }
+
+  .time-display {
+    font-size: 12px;
+  }
 }
 

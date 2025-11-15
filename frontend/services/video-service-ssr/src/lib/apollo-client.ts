@@ -20,7 +20,8 @@ function createClient(uri: string) {
     };
   });
 
-  const errorLink = onError(({ graphQLErrors, networkError, operation, forward }) => {
+  const errorLink = onError(({ graphQLErrors, networkError, operation }) => {
+    // Логируем ошибки для отладки, но не прерываем работу приложения
     if (graphQLErrors) {
       graphQLErrors.forEach(({ message, locations, path, extensions }) => {
         console.error(`[GraphQL error]:`, {

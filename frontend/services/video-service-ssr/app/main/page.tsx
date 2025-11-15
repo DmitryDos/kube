@@ -1,21 +1,21 @@
-import { Suspense } from 'react';
-import { MainPageClient } from '../../src/views/MainPage/MainPageClient';
-import { SearchParams } from '../../src/types/pageParams';
+'use client';
 
-export const dynamic = 'force-dynamic';
+import { Carousel2 } from '../../src/components/Carousel/Carousel2';
+import { PlayerPage } from '../../src/components/PlayerPage/PlayerPage';
+import { PlaylistsPage } from '../../src/components/PlaylistsPage/PlaylistsPage';
+import { AuthPage } from '../../src/components/AuthPage/AuthPage';
 
-type MainPageProps = {
-  searchParams: SearchParams<{ q?: string; filter?: string }>;
-};
-
-export default async function MainPage(props: MainPageProps) {
-  const searchParams = await props.searchParams;
-  const query = searchParams.q || '';
-  const filter = (searchParams.filter as 'all' | 'videos' | 'authors') || 'all';
+export default function MainPage() {
+  const pages = [
+    <PlayerPage key="player" videoId="550e8400-e29b-41d4-a716-446655440000" />,
+    <PlaylistsPage key="playlists" />,
+    <AuthPage key="auth" />,
+  ];
 
   return (
-    <Suspense fallback={<div>Загрузка...</div>}>
-      <MainPageClient initialQuery={query} initialFilter={filter} />
-    </Suspense>
+    <div style={{ width: '100%', height: '100%', overflow: 'hidden' }}>
+      <Carousel2 pages={pages} initialPage={0} />
+    </div>
   );
 }
+

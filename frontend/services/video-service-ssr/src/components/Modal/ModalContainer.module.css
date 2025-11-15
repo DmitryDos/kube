@@ -1,0 +1,162 @@
+.modal-container {
+  height: min(70vh, 1000px);
+  width: calc(min(70vh, 1000px) / 1.5);
+  background: var(--secondary-color);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  outline: none;
+  user-select: none;
+}
+
+.modal-container:focus {
+  outline: none;
+}
+
+.modal-container::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Если высота экрана меньше 600px - модалка на весь экран */
+@media (max-height: 600px) {
+  .modal-container {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    border: none;
+  }
+  
+  .modal-container::before {
+    display: none;
+  }
+}
+
+/* Если вычисленная ширина меньше (ширина экрана - 32px) - модалка на весь экран */
+/* Для 1000px / 1.5 = 666px, если 100vw - 32px < 666px, то полный экран */
+/* То есть если 100vw < 698px, то полный экран */
+@media (max-width: 698px) {
+  .modal-container {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    border: none;
+  }
+  
+  .modal-container::before {
+    display: none;
+  }
+}
+
+/* Для случая когда используется 70vh вместо 1000px */
+/* Если 70vh / 1.5 < 100vw - 32px, то полный экран */
+/* Это когда 70vh < (100vw - 32px) * 1.5 */
+/* Для высоты 800px: 70vh = 560px, ширина = 373px, нужно проверить 373px < 100vw - 32px */
+/* Для высоты 600px: 70vh = 420px, ширина = 280px, нужно проверить 280px < 100vw - 32px */
+/* Используем комбинацию условий для разных соотношений */
+@media (max-width: 480px) {
+  .modal-container {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    border: none;
+  }
+  
+  .modal-container::before {
+    display: none;
+  }
+}
+
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  background: var(--secondary-color);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  z-index: 1;
+}
+
+.modal-left-button,
+.modal-spacer {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+}
+
+.modal-title {
+  flex: 1;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--accent-color);
+  margin: 0;
+}
+
+.modal-close-button {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--accent-color);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: opacity 0.2s ease;
+}
+
+.modal-close-button:hover {
+  opacity: 0.7;
+}
+
+.modal-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+  position: relative;
+  z-index: 1;
+  user-select: text;
+}
+
+.modal-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.modal-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+}
+
+.modal-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.modal-bottom-button {
+  padding: 16px;
+  background: var(--secondary-color);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  position: relative;
+  z-index: 1;
+}
+

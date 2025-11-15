@@ -26,11 +26,16 @@ export function useAuth() {
       if (data?.me) {
         setCurrentUser(data.me);
         setIsAuthenticated(true);
+        setError(null);
       } else {
         clearSession();
+        setError(null);
       }
-    } catch (err) {
+    } catch (err: any) {
+      // При восстановлении сессии ошибки не критичны - просто очищаем сессию
       clearSession();
+      // Не устанавливаем ошибку при восстановлении - это нормально, если пользователь не авторизован
+      setError(null);
     } finally {
       setIsLoading(false);
     }
@@ -61,7 +66,21 @@ export function useAuth() {
           throw new Error('Login failed');
         }
       } catch (err: any) {
-        const errorMessage = err.message || 'Ошибка входа';
+        let errorMessage = 'Ошибка входа. Проверьте подключение к интернету.';
+        
+        if (err?.graphQLErrors && err.graphQLErrors.length > 0) {
+          errorMessage = err.graphQLErrors[0].message;
+        } else if (err?.networkError) {
+          const networkErr = err.networkError;
+          if (networkErr.message?.includes('Failed to fetch') || networkErr.message?.includes('NetworkError')) {
+            errorMessage = 'Нет подключения к интернету. Проверьте соединение и попробуйте снова.';
+          } else {
+            errorMessage = networkErr.message || errorMessage;
+          }
+        } else if (err?.message) {
+          errorMessage = err.message;
+        }
+        
         setError(errorMessage);
         throw err;
       } finally {
@@ -92,7 +111,21 @@ export function useAuth() {
           throw new Error('Registration failed');
         }
       } catch (err: any) {
-        const errorMessage = err.message || 'Ошибка регистрации';
+        let errorMessage = 'Ошибка регистрации. Проверьте подключение к интернету.';
+        
+        if (err?.graphQLErrors && err.graphQLErrors.length > 0) {
+          errorMessage = err.graphQLErrors[0].message;
+        } else if (err?.networkError) {
+          const networkErr = err.networkError;
+          if (networkErr.message?.includes('Failed to fetch') || networkErr.message?.includes('NetworkError')) {
+            errorMessage = 'Нет подключения к интернету. Проверьте соединение и попробуйте снова.';
+          } else {
+            errorMessage = networkErr.message || errorMessage;
+          }
+        } else if (err?.message) {
+          errorMessage = err.message;
+        }
+        
         setError(errorMessage);
         throw err;
       } finally {

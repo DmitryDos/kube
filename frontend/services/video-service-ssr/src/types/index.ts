@@ -66,3 +66,16 @@ export interface RegisterRequest {
   name: string;
 }
 
+// Playlist types
+export interface Playlist {
+  id: UUID;
+  name: string;
+  isSystem: boolean;
+  videoIds: UUID[];
+  order?: number; // для drag and drop
+}
+
+export interface PlaylistWithVideos extends Omit<Playlist, 'videoIds'> {
+  videos: Video[];
+}
+

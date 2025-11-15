@@ -50,8 +50,19 @@ export function useSearch() {
             total: data.total || 0,
           },
         };
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Ошибка поиска';
+      } catch (err: any) {
+        let errorMessage = 'Ошибка поиска. Проверьте подключение к интернету.';
+        
+        if (err instanceof Error) {
+          if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+            errorMessage = 'Нет подключения к интернету. Проверьте соединение и попробуйте снова.';
+          } else if (err.message.includes('404')) {
+            errorMessage = 'Сервис поиска временно недоступен.';
+          } else {
+            errorMessage = err.message;
+          }
+        }
+        
         setError(errorMessage);
         throw err;
       } finally {

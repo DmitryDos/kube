@@ -7,14 +7,20 @@
     "build": "next build",
     "start": "next start",
     "lint": "biome check .",
-    "tsc": "tsc"
+    "tsc": "tsc",
+    "storybook:start": "storybook dev -p 6003",
+    "storybook:build": "storybook build"
   },
   "dependencies": {
     "next": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "@apollo/client": "catalog:",
-    "graphql": "catalog:"
+    "graphql": "catalog:",
+    "@storybook/addon-themes": "catalog:",
+    "@storybook/nextjs": "catalog:",
+    "@storybook/react": "catalog:",    
+    "storybook": "catalog:"
   },
   "devDependencies": {
     "@types/node": "catalog:",

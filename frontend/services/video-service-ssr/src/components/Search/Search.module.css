@@ -1,0 +1,146 @@
+/* src/components/Search/Search.module.css */
+.search {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin: 12px auto;
+}
+
+.search-bar-wrapper {
+  flex: 1;
+  min-width: 0;
+}
+
+.filter-chips-wrapper {
+  flex-shrink: 0;
+}
+
+/* Media queries for narrow screens */
+@media (max-width: 732px) {
+  .search {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-bar-wrapper {
+    width: 100%;
+  }
+
+  .filter-chips-wrapper {
+    width: 100%;
+  }
+}
+
+.loading,
+.error,
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 16px;
+  color: var(--text-color);
+  opacity: 0.7;
+}
+
+.loading svg,
+.empty svg {
+  color: var(--accent-color);
+  opacity: 0.5;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--secondary-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error {
+  color: var(--text-color);
+}
+
+.retry-button {
+  padding: 8px 16px;
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.retry-button:hover {
+  opacity: 0.9;
+  transform: scale(1.05);
+}
+
+.empty p {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.empty-hint {
+  font-size: 14px;
+  font-weight: 400;
+  opacity: 0.6;
+}
+
+.loading-more {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+}
+
+.loading-more .spinner {
+  width: 24px;
+  height: 24px;
+  border-width: 2px;
+}
+
+/* Media queries for narrow screens */
+@media (max-width: 480px) {
+  .loading,
+  .error,
+  .empty {
+    padding: 30px 16px;
+    gap: 12px;
+  }
+
+  .empty svg {
+    width: 48px;
+    height: 48px;
+  }
+
+  .empty p {
+    font-size: 14px;
+  }
+
+  .empty-hint {
+    font-size: 12px;
+  }
+}
+
+/* На экранах <= 420px убираем паддинги */
+@media (max-width: 420px) {
+  .search {
+    margin: 0;
+    padding: 12px;
+  }
+}
+

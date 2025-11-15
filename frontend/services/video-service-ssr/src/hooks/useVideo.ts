@@ -42,8 +42,19 @@ export function useVideo() {
         );
 
         return videoResult?.data || null;
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'Ошибка загрузки видео';
+      } catch (err: any) {
+        let errorMessage = 'Ошибка загрузки видео. Проверьте подключение к интернету.';
+        
+        if (err instanceof Error) {
+          if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+            errorMessage = 'Нет подключения к интернету. Проверьте соединение и попробуйте снова.';
+          } else if (err.message.includes('404')) {
+            errorMessage = 'Видео не найдено.';
+          } else {
+            errorMessage = err.message;
+          }
+        }
+        
         setError(errorMessage);
         return null;
       } finally {

@@ -1,0 +1,29 @@
+/* src/components/UserAvatar/UserAvatar.module.css */
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent-color), var(--primary-color));
+  color: var(--text-color);
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-bottom: 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.initials {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: white;
+}
+
+.icon {
+  width: 60%;
+  height: 60%;
+  color: rgba(255, 255, 255, 0.8);
+}
+
