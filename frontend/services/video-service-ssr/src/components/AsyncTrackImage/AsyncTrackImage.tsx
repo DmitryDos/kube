@@ -16,18 +16,27 @@ function AsyncTrackImageContent({ video, fallback }: AsyncTrackImageProps) {
   const finalImageUrl = imageUrl || fallback;
   const [hasError, setHasError] = useState(false);
 
-  // Показываем fallback только если нет изображения или ошибка загрузки
-  const showFallback = (!finalImageUrl || hasError) && !isLoading;
+  // Проверяем валидность URL
+  const isValidUrl = finalImageUrl && (
+    finalImageUrl.startsWith('http://') || 
+    finalImageUrl.startsWith('https://') || 
+    finalImageUrl.startsWith('/') ||
+    finalImageUrl.startsWith('data:')
+  );
+
+  // Показываем fallback только если нет изображения, невалидный URL или ошибка загрузки
+  const showFallback = (!finalImageUrl || !isValidUrl || hasError) && !isLoading;
 
   return (
     <>
-      {finalImageUrl && !hasError && (
+      {finalImageUrl && isValidUrl && !hasError && (
         <img
           src={finalImageUrl}
-          alt={video.title}
+          alt={video.title || ''}
           className={styles['image']}
           loading="lazy"
           onError={() => setHasError(true)}
+          onLoad={() => setHasError(false)}
         />
       )}
       {showFallback && (

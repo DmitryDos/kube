@@ -39,7 +39,7 @@ export function Player({ video, authorName, isLoading = false, error, onPlay, on
           </div>
         ) : (
           <VideoPlayer
-            videoUrl={video.file_url || `/api/videos/${video.id}/stream/proxy`}
+            videoUrl={`/api/videos/${video.id}/stream/proxy`}
             thumbnailUrl={video.thumbnail_url}
             title={video.title}
             onPlay={onPlay}

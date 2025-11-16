@@ -84,10 +84,12 @@ export function PlayerPage({ videoId: initialVideoId, onVideoClick, onAuthorClic
   // Если видео не выбрано, показываем только SearchPage
   if (!selectedVideoId) {
     return (
-      <SearchPage
-        onVideoClick={handleVideoClick}
-        onAuthorClick={onAuthorClick}
-      />
+      <div style={{ width: '100%', height: '100vh', overflow: 'auto' }}>
+        <SearchPage
+          onVideoClick={handleVideoClick}
+          onAuthorClick={onAuthorClick}
+        />
+      </div>
     );
   }
 
@@ -254,10 +256,12 @@ export function PlayerPage({ videoId: initialVideoId, onVideoClick, onAuthorClic
       </div>
       <div ref={searchSectionRef} className={styles['search-section']}>
         <div ref={searchContainerRef} className={styles['search-container']}>
-          <SearchPage
-            onVideoClick={handleVideoClick}
-            onAuthorClick={onAuthorClick}
-          />
+          <div data-embedded="true">
+            <SearchPage
+              onVideoClick={handleVideoClick}
+              onAuthorClick={onAuthorClick}
+            />
+          </div>
         </div>
       </div>
     </div>

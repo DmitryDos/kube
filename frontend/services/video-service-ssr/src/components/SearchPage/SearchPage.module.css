@@ -9,6 +9,12 @@
   overflow: hidden;
 }
 
+/* Когда SearchPage рендерится отдельно (не в PlayerPage), разрешаем скролл */
+:not([data-embedded]) .search-page {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 .search-header {
   width: 100%;
   flex-shrink: 0;
@@ -48,6 +54,11 @@
 /* Разрешаем скролл когда на родителе есть класс scroll-enabled */
 :global(.scroll-enabled) :global(.search-page) .search-results,
 :global(.scroll-enabled) .search-results {
+  overflow-y: auto !important;
+}
+
+/* Когда SearchPage рендерится отдельно (не в PlayerPage), разрешаем скролл */
+:not([data-embedded]) .search-page .search-results {
   overflow-y: auto !important;
 }
 

@@ -18,6 +18,19 @@ export function useTrackImage(video: Video) {
       return;
     }
 
+    // Проверяем валидность URL - должен начинаться с http://, https://, / или data:
+    const isValidUrl = video.thumbnail_url.startsWith('http://') || 
+                       video.thumbnail_url.startsWith('https://') || 
+                       video.thumbnail_url.startsWith('/') ||
+                       video.thumbnail_url.startsWith('data:');
+
+    if (!isValidUrl) {
+      setImageUrl(null);
+      setIsLoading(false);
+      setError('Invalid thumbnail URL');
+      return;
+    }
+
     // Проверяем кэш
     const cachedUrl = imageUrlCache.get(video.thumbnail_url);
     if (cachedUrl) {

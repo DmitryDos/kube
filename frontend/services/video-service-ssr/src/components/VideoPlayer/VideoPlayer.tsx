@@ -31,7 +31,7 @@ export function VideoPlayer({
   const [isMuted, setIsMuted] = useState(false);
   const [showControls, setShowControls] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const controlsTimeoutRef = useRef<NodeJS.Timeout>();
+  const controlsTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -167,7 +167,12 @@ export function VideoPlayer({
         <video
           ref={videoRef}
           src={videoUrl}
-          poster={thumbnailUrl}
+          poster={thumbnailUrl && (
+            thumbnailUrl.startsWith('http://') || 
+            thumbnailUrl.startsWith('https://') || 
+            thumbnailUrl.startsWith('/') ||
+            thumbnailUrl.startsWith('data:')
+          ) ? thumbnailUrl : undefined}
           className={styles['video']}
           onClick={handlePlayPause}
         />
