@@ -81,18 +81,6 @@ export function PlayerPage({ videoId: initialVideoId, onVideoClick, onAuthorClic
     setIsWideFormat(!isWideFormat);
   };
 
-  // Если видео не выбрано, показываем только SearchPage
-  if (!selectedVideoId) {
-    return (
-      <div style={{ width: '100%', height: '100vh', overflow: 'auto' }}>
-        <SearchPage
-          onVideoClick={handleVideoClick}
-          onAuthorClick={onAuthorClick}
-        />
-      </div>
-    );
-  }
-
   // Проверяем видимость секции для разрешения скролла (только когда видео выбрано)
   useEffect(() => {
     if (!selectedVideoId) return;
@@ -235,6 +223,18 @@ export function PlayerPage({ videoId: initialVideoId, onVideoClick, onAuthorClic
       });
     };
   }, [selectedVideoId]);
+
+  // Если видео не выбрано, показываем только SearchPage (после всех хуков!)
+  if (!selectedVideoId) {
+    return (
+      <div style={{ width: '100%', height: '100vh', overflow: 'auto' }}>
+        <SearchPage
+          onVideoClick={handleVideoClick}
+          onAuthorClick={onAuthorClick}
+        />
+      </div>
+    );
+  }
 
   return (
     <div ref={pageRef} className={`${styles['player-page']} ${isWideFormat ? styles['wide-format'] : ''}`}>
