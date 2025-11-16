@@ -1,24 +1,32 @@
 /* src/components/PlayerPage/PlayerPage.module.css */
 .player-page {
   display: flex;
+  justify-content: center;
   flex-direction: row;
   align-items: flex-start;
-  width: 100%;
-  margin: 0 auto;
+  width: 100vw;
   height: 100vh;
-  padding: 20px;
+  margin: 0 auto;
   box-sizing: border-box;
-  overflow: hidden;
   gap: 12px;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
 }
 
 .player-section {
+  padding: 6px;
+
   min-width: 0;
   height: auto;
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: visible;
+  z-index: 1;
 }
 
 .format-toggle {
@@ -45,12 +53,19 @@
 }
 
 .search-section {
+  z-index: 2;
   flex-shrink: 0;
   width: 400px;
   height: 100%;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+
+  background: var(--secondary-color);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-top-left-radius: 12px;
+  border-top-right-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .search-container {
@@ -59,129 +74,57 @@
   height: 100%;
 }
 
-.search-results {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
-  min-height: 0;
-}
-
-.search-results::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
-}
-
-.card-placeholder {
+/* Адаптация SearchPage для использования в боковой панели */
+.search-container :global(.search-page) {
   width: 100%;
-  padding: 12px;
+  height: 100%;
+  margin: 0;
+  padding: 0;
 }
 
-.card-skeleton {
-  width: 100%;
-  height: 120px;
-  background: var(--secondary-color);
-  border-radius: 8px;
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% {
-    opacity: 0.6;
-  }
-  50% {
-    opacity: 0.3;
-  }
-}
-
-.loading,
-.error,
-.empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 60px 20px;
-  text-align: center;
-  color: var(--text-color);
-}
-
-.loading p,
-.error p,
-.empty p {
-  margin: 16px 0 0 0;
-  font-size: 16px;
-  opacity: 0.8;
-}
-
-.loading .spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid rgba(255, 255, 255, 0.1);
-  border-top-color: var(--accent-color);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.error svg {
-  width: 64px;
-  height: 64px;
-  color: #ff6b6b;
-  opacity: 0.8;
-  margin-bottom: 8px;
-}
-
-.empty svg {
-  width: 64px;
-  height: 64px;
-  opacity: 0.6;
-  margin-bottom: 8px;
-}
 
 .player-page.wide-format {
   flex-direction: column;
+  justify-content: flex-start;
 }
 
 .player-page.wide-format .player-section {
   width: 100%;
   height: auto;
   max-height: none;
+
+  position: sticky;
+  top: 0;
 }
 
-.search-section-wide {
+.player-page.wide-format .search-section {
   width: 100%;
   height: auto;
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+
+  height: 80vh;
 }
 
 /* Media queries */
 @media (max-width: 1000px) {
   .player-page {
     flex-direction: column;
-    padding: 16px;
+    justify-content: flex-start;
   }
 
   .player-section {
     width: 100%;
     max-width: 100%;
     height: auto;
+
+    position: sticky;
+    top: 0;
   }
 
   .search-section {
     width: 100%;
     height: auto;
-    flex: 1;
-    min-height: 0;
+
+    height: 80vh;
   }
 }
 
@@ -197,10 +140,6 @@
 
   .player-section {
     padding: 12px;
-  }
-
-  .search-section {
-    padding: 0 12px 12px 12px;
   }
 
   .search-container {

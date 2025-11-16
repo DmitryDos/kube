@@ -149,7 +149,7 @@ export function EditPlaylistModal({ playlist, onSave, onDelete }: EditPlaylistMo
               </button>
             </div>
           ) : (
-            <List gap={12} columns={2}>
+            <List gap={12}>
               {availableVideos.map((video) => (
                 <div key={video.id} className={styles['video-item']}>
                   <label className={styles['checkbox-label']}>

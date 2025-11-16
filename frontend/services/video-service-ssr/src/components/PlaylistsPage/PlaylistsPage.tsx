@@ -54,7 +54,7 @@ export function PlaylistsPage({ onVideoClick }: PlaylistsPageProps) {
 
   useEffect(() => {
     const checkDesktop = () => {
-      setIsDesktop(window.innerWidth >= 1024);
+      setIsDesktop(window.innerWidth >= 1064);
     };
     
     checkDesktop();
@@ -171,7 +171,6 @@ export function PlaylistsPage({ onVideoClick }: PlaylistsPageProps) {
               <SearchBar
                 value={searchQuery}
                 onChange={handleSearchChange}
-                onClear={() => setSearchQuery('')}
                 placeholder="Поиск видео"
               />
             </div>

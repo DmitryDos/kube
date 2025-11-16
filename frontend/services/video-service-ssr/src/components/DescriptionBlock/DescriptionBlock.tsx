@@ -33,7 +33,7 @@ export function DescriptionBlock({
       const maxHeight = Math.min(availableHeight, window.innerHeight * 0.425); // Максимум 42.5% экрана или доступная высота
       expandedRef.current.style.minHeight = `${minHeight}px`;
       expandedRef.current.style.maxHeight = `${maxHeight}px`;
-      expandedRef.current.style.bottom = `${window.innerHeight - containerRect.bottom}px`;
+      expandedRef.current.style.bottom = `${window.innerHeight - containerRect.bottom - 24}px`;
     }
   }, [isExpanded]);
 

@@ -1,11 +1,9 @@
 /* src/components/Search/Search.module.css */
 .search {
   display: flex;
-  flex-direction: row;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
   width: 100%;
-  margin: 12px auto;
 }
 
 .search-bar-wrapper {
@@ -15,22 +13,6 @@
 
 .filter-chips-wrapper {
   flex-shrink: 0;
-}
-
-/* Media queries for narrow screens */
-@media (max-width: 732px) {
-  .search {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .search-bar-wrapper {
-    width: 100%;
-  }
-
-  .filter-chips-wrapper {
-    width: 100%;
-  }
 }
 
 .loading,
@@ -135,12 +117,3 @@
     font-size: 12px;
   }
 }
-
-/* На экранах <= 420px убираем паддинги */
-@media (max-width: 420px) {
-  .search {
-    margin: 0;
-    padding: 12px;
-  }
-}
-

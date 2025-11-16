@@ -46,7 +46,7 @@ export function Carousel2({
 
   const getPageWidth = useCallback(() => {
     const containerWidth = getContainerWidth();
-    return containerWidth * 1.06;
+    return containerWidth + 120;
   }, [getContainerWidth]);
 
   const getMaxOffset = useCallback(() => {
@@ -157,6 +157,16 @@ export function Carousel2({
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     const container = containerRef.current;
     if (!container || isTransitioningRef.current) return;
+    
+    // Не блокируем клики на интерактивных элементах
+    const target = e.target as HTMLElement;
+    if (target.tagName === 'INPUT' || 
+        target.tagName === 'BUTTON' || 
+        target.tagName === 'A' ||
+        target.tagName === 'FORM' ||
+        target.closest('input, button, a, form, [role="button"], [role="textbox"]')) {
+      return;
+    }
     
     e.preventDefault();
     container.setPointerCapture(e.pointerId);

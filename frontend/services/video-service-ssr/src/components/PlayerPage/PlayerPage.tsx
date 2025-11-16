@@ -1,19 +1,15 @@
 // src/components/PlayerPage/PlayerPage.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Player } from '../Player/Player';
-import { Search } from '../Search/Search';
-import { List } from '../List/List';
-import { VideoCard } from '../VideoCard/VideoCard';
-import { AuthorCard } from '../AuthorCard/AuthorCard';
+import { SearchPage } from '../SearchPage/SearchPage';
 import { useVideo } from '../../hooks/useVideo';
-import { useSearch } from '../../hooks/useSearch';
-import { Video, Author, SearchFilter, SearchResultItem } from '../../types';
+import { Video, Author } from '../../types';
 import styles from './PlayerPage.module.css';
 
 interface PlayerPageProps {
-  videoId: string;
+  videoId?: string;
   onVideoClick?: (video: Video) => void;
   onAuthorClick?: (author: Author) => void;
 }
@@ -59,147 +55,189 @@ function PlayerContent({ videoId }: { videoId: string }) {
   );
 }
 
-function SearchResultsContent({ 
-  searchQuery, 
-  selectedFilter, 
-  onVideoClick, 
-  onAuthorClick 
-}: { 
-  searchQuery: string; 
-  selectedFilter: SearchFilter;
-  onVideoClick?: (video: Video) => void;
-  onAuthorClick?: (author: Author) => void;
-}) {
-  const { search } = useSearch();
-  const [results, setResults] = useState<SearchResultItem[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setResults([]);
-      setIsLoading(false);
-      return;
-    }
-
-    let cancelled = false;
-    setIsLoading(true);
-    setError(null);
-    
-    const timer = setTimeout(() => {
-      search(searchQuery, 1, 20, selectedFilter)
-        .then((response) => {
-          if (!cancelled) {
-            setResults(response.results);
-            setIsLoading(false);
-          }
-        })
-        .catch((err: any) => {
-          if (!cancelled) {
-            const errorMessage = err?.message || err?.networkError?.message || 'Ошибка поиска. Проверьте подключение к интернету.';
-            setError(errorMessage);
-            setIsLoading(false);
-          }
-        });
-    }, 300);
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [searchQuery, selectedFilter]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const filteredResults = results.filter((item) => {
-    if (selectedFilter === 'all') return true;
-    if (selectedFilter === 'videos') return item.type === 'video';
-    if (selectedFilter === 'authors') return item.type === 'author';
-    return true;
-  });
-
-  if (isLoading && results.length === 0) {
-    return (
-      <div className={styles['loading']}>
-        <div className={styles['spinner']}></div>
-        <p>Ищем...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className={styles['error']}>
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="12" cy="12" r="10" />
-          <line x1="12" y1="8" x2="12" y2="12" />
-          <line x1="12" y1="16" x2="12.01" y2="16" />
-        </svg>
-        <p>{error}</p>
-      </div>
-    );
-  }
-
-  if (filteredResults.length === 0 && searchQuery) {
-    return (
-      <div className={styles['empty']}>
-        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.35-4.35" />
-        </svg>
-        <p>Ничего не найдено</p>
-      </div>
-    );
-  }
-
-  if (filteredResults.length === 0) {
-    return null;
-  }
-
-  return (
-    <List gap={12} columns={1}>
-      {filteredResults.map((item) => {
-        if (item.type === 'video') {
-          return (
-            <VideoCard
-              key={item.data.id}
-              video={item.data}
-              onClick={onVideoClick}
-            />
-          );
-        } else {
-          return (
-            <AuthorCard
-              key={item.data.id}
-              author={item.data}
-              onClick={onAuthorClick}
-            />
-          );
-        }
-      })}
-    </List>
+export function PlayerPage({ videoId: initialVideoId, onVideoClick, onAuthorClick }: PlayerPageProps) {
+  const [selectedVideoId, setSelectedVideoId] = useState<string | undefined>(
+    initialVideoId && initialVideoId.trim() !== '' ? initialVideoId : undefined
   );
-}
-
-export function PlayerPage({ videoId, onVideoClick, onAuthorClick }: PlayerPageProps) {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState<SearchFilter>('all');
   const [isWideFormat, setIsWideFormat] = useState(false);
+  const pageRef = useRef<HTMLDivElement>(null);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  const searchSectionRef = useRef<HTMLDivElement>(null);
 
-  const handleSearchChange = (value: string) => {
-    setSearchQuery(value);
-  };
+  // Обновляем selectedVideoId при изменении initialVideoId
+  useEffect(() => {
+    setSelectedVideoId(
+      initialVideoId && initialVideoId.trim() !== '' ? initialVideoId : undefined
+    );
+  }, [initialVideoId]);
 
-  const handleFilterChange = (filter: SearchFilter) => {
-    setSelectedFilter(filter);
+  const handleVideoClick = (video: Video) => {
+    setSelectedVideoId(video.id);
+    onVideoClick?.(video);
   };
 
   const handleToggleFormat = () => {
     setIsWideFormat(!isWideFormat);
   };
 
+  // Если видео не выбрано, показываем только SearchPage
+  if (!selectedVideoId) {
+    return (
+      <SearchPage
+        onVideoClick={handleVideoClick}
+        onAuthorClick={onAuthorClick}
+      />
+    );
+  }
+
+  // Проверяем видимость секции для разрешения скролла (только когда видео выбрано)
+  useEffect(() => {
+    if (!selectedVideoId) return;
+    
+    const page = pageRef.current;
+    const searchSection = searchSectionRef.current;
+    const searchContainer = searchContainerRef.current;
+    
+    if (!page || !searchSection || !searchContainer) return;
+
+    const checkVisibility = () => {
+      const pageScrollTop = page.scrollTop;
+      const pageHeight = page.clientHeight;
+      const sectionTop = searchSection.offsetTop;
+      const sectionHeight = searchSection.offsetHeight;
+      const sectionBottom = sectionTop + sectionHeight;
+      
+      // Секция полностью видна, если её нижняя граница находится в видимой области
+      const isVisible = pageScrollTop + pageHeight >= sectionBottom;
+      
+      // Управляем скроллом через класс на search-section
+      if (isVisible) {
+        searchSection.classList.add('scroll-enabled');
+      } else {
+        searchSection.classList.remove('scroll-enabled');
+      }
+    };
+
+    checkVisibility();
+    page.addEventListener('scroll', checkVisibility);
+    window.addEventListener('resize', checkVisibility);
+    
+    return () => {
+      page.removeEventListener('scroll', checkVisibility);
+      window.removeEventListener('resize', checkVisibility);
+    };
+  }, [selectedVideoId]);
+
+
+  // Каскадный скролл: когда скроллишь список вверх и он уже в начале, секция закрывается (только когда видео выбрано)
+  useEffect(() => {
+    if (!selectedVideoId) return;
+    
+    const page = pageRef.current;
+    const searchContainer = searchContainerRef.current;
+    
+    if (!page || !searchContainer) return;
+
+    const handleSearchResultsWheel = (e: WheelEvent) => {
+      // Проверяем, видна ли секция полностью
+      const searchSection = searchContainer.parentElement;
+      if (!searchSection) return;
+      
+      const pageScrollTop = page.scrollTop;
+      const pageHeight = page.clientHeight;
+      const sectionTop = searchSection.offsetTop;
+      const sectionHeight = searchSection.offsetHeight;
+      const sectionBottom = sectionTop + sectionHeight;
+      const isSectionFullyVisible = pageScrollTop + pageHeight >= sectionBottom;
+
+      // Если секция не видна, блокируем скролл и перенаправляем на страницу
+      if (!isSectionFullyVisible) {
+        page.scrollTop += e.deltaY;
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+
+      // Находим элемент .search-results внутри SearchPage
+      const searchResults = searchContainer.querySelector('.search-results') as HTMLElement;
+      if (!searchResults) return;
+
+      // Проверяем, можно ли скроллить результаты
+      const resultsScrollTop = searchResults.scrollTop;
+      const resultsScrollHeight = searchResults.scrollHeight;
+      const resultsClientHeight = searchResults.clientHeight;
+      
+      // Если скроллим вверх и результаты уже в начале, передаем скролл на страницу
+      if (e.deltaY < 0 && resultsScrollTop === 0) {
+        page.scrollTop += e.deltaY;
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      // Если скроллим вниз и результаты уже в конце, передаем скролл на страницу
+      else if (e.deltaY > 0 && resultsScrollTop + resultsClientHeight >= resultsScrollHeight) {
+        page.scrollTop += e.deltaY;
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+
+    // Функция для добавления обработчика
+    const addWheelHandler = () => {
+      const searchResults = searchContainer.querySelector('.search-results') as HTMLElement;
+      if (searchResults) {
+        searchResults.addEventListener('wheel', handleSearchResultsWheel, { passive: false });
+        return searchResults;
+      }
+      return null;
+    };
+
+    // Используем MutationObserver для отслеживания изменений в SearchPage
+    const observer = new MutationObserver(() => {
+      // Переподключаем обработчик при изменении DOM
+      const searchResults = searchContainer.querySelector('.search-results') as HTMLElement;
+      if (searchResults && !searchResults.hasAttribute('data-wheel-handler')) {
+        searchResults.setAttribute('data-wheel-handler', 'true');
+        searchResults.addEventListener('wheel', handleSearchResultsWheel, { passive: false });
+      }
+    });
+
+    // Наблюдаем за изменениями в searchContainer
+    observer.observe(searchContainer, {
+      childList: true,
+      subtree: true,
+    });
+    
+    // Пытаемся добавить обработчик сразу и с небольшой задержкой
+    let searchResults = addWheelHandler();
+    if (searchResults) {
+      searchResults.setAttribute('data-wheel-handler', 'true');
+    }
+    
+    const timeoutId = setTimeout(() => {
+      if (!searchResults) {
+        searchResults = addWheelHandler();
+        if (searchResults) {
+          searchResults.setAttribute('data-wheel-handler', 'true');
+        }
+      }
+    }, 100);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      observer.disconnect();
+      const allResults = searchContainer.querySelectorAll('.search-results[data-wheel-handler]');
+      allResults.forEach((el) => {
+        el.removeEventListener('wheel', handleSearchResultsWheel as EventListener);
+        el.removeAttribute('data-wheel-handler');
+      });
+    };
+  }, [selectedVideoId]);
+
   return (
-    <div className={`${styles['player-page']} ${isWideFormat ? styles['wide-format'] : ''}`}>
+    <div ref={pageRef} className={`${styles['player-page']} ${isWideFormat ? styles['wide-format'] : ''}`}>
       <div className={styles['player-section']}>
-        <PlayerContent videoId={videoId} />
+        <PlayerContent videoId={selectedVideoId} />
         <button
           className={styles['format-toggle']}
           onClick={handleToggleFormat}
@@ -214,48 +252,14 @@ export function PlayerPage({ videoId, onVideoClick, onAuthorClick }: PlayerPageP
           </svg>
         </button>
       </div>
-      {!isWideFormat && (
-        <div className={styles['search-section']}>
-          <div className={styles['search-container']}>
-            <Search
-              searchQuery={searchQuery}
-              selectedFilter={selectedFilter}
-              onSearchChange={handleSearchChange}
-              onFilterChange={handleFilterChange}
-              onClear={() => setSearchQuery('')}
-            />
-            <div className={styles['search-results']}>
-              <SearchResultsContent
-                searchQuery={searchQuery}
-                selectedFilter={selectedFilter}
-                onVideoClick={onVideoClick}
-                onAuthorClick={onAuthorClick}
-              />
-            </div>
-          </div>
+      <div ref={searchSectionRef} className={styles['search-section']}>
+        <div ref={searchContainerRef} className={styles['search-container']}>
+          <SearchPage
+            onVideoClick={handleVideoClick}
+            onAuthorClick={onAuthorClick}
+          />
         </div>
-      )}
-      {isWideFormat && (
-        <div className={styles['search-section-wide']}>
-          <div className={styles['search-container']}>
-            <Search
-              searchQuery={searchQuery}
-              selectedFilter={selectedFilter}
-              onSearchChange={handleSearchChange}
-              onFilterChange={handleFilterChange}
-              onClear={() => setSearchQuery('')}
-            />
-            <div className={styles['search-results']}>
-              <SearchResultsContent
-                searchQuery={searchQuery}
-                selectedFilter={selectedFilter}
-                onVideoClick={onVideoClick}
-                onAuthorClick={onAuthorClick}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }

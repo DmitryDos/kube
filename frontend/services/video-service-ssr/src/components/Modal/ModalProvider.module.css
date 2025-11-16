@@ -17,7 +17,7 @@
 }
 
 /* На экранах <= 420px wrapper занимает весь экран */
-@media (max-width: 420px) {
+@media (max-width: 480px) {
   .modal-overlay {
     align-items: stretch;
     justify-content: stretch;

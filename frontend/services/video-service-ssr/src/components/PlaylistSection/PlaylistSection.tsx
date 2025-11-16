@@ -141,8 +141,9 @@ export function PlaylistSection({
           isLoading={isLoading}
           isEmpty={!isLoading && filteredVideos.length === 0}
           emptyMessage={searchQuery ? 'Ничего не найдено' : 'Плейлист пуст'}
-          columns={2}
           gap={12}
+          autoHeight={true}
+          listClassName="playlist-grid-desktop"
         >
           {filteredVideos.map((video) => (
             <div key={video.id} className={styles['video-wrapper']}>

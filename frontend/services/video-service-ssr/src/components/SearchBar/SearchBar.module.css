@@ -1,6 +1,8 @@
 /* src/components/SearchBar/SearchBar.module.css */
 .search-container {
   width: 100%;
+  min-width: 320px;
+  max-width: 732px;
 }
 
 .search-button {
@@ -23,10 +25,6 @@
   transform: scale(1.05);
 }
 
-.search-form {
-  width: 100%;
-}
-
 .search-input-wrapper {
   display: flex;
   align-items: center;
@@ -36,6 +34,7 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
   transition: all 0.3s ease;
+  touch-action: manipulation;
 }
 
 .search-input-wrapper:focus-within {
@@ -58,6 +57,8 @@
   font-family: inherit;
   outline: none;
   padding: 0;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .search-input::placeholder {
@@ -65,7 +66,7 @@
   opacity: 0.5;
 }
 
-.clear-button {
+.submit-button {
   flex-shrink: 0;
   width: 20px;
   height: 20px;
@@ -74,15 +75,22 @@
   justify-content: center;
   background: transparent;
   border: none;
+  border-radius: 8px;
   cursor: pointer;
   color: var(--text-color);
   opacity: 0.6;
   padding: 0;
-  transition: opacity 0.2s ease;
+  transition: all 0.2s ease;
 }
 
-.clear-button:hover {
+.submit-button:hover:not(:disabled) {
   opacity: 1;
+  transform: scale(1.05);
+}
+
+.submit-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 /* Media queries for narrow screens */

@@ -11,7 +11,6 @@ interface SearchProps {
   selectedFilter: SearchFilter;
   onSearchChange: (value: string) => void;
   onFilterChange: (filter: SearchFilter) => void;
-  onClear: () => void;
   onSubmit?: () => void;
   placeholder?: string;
 }
@@ -21,7 +20,6 @@ export function Search({
   selectedFilter,
   onSearchChange,
   onFilterChange,
-  onClear,
   onSubmit,
   placeholder = 'Поиск видео и авторов'
 }: SearchProps) {
@@ -33,7 +31,6 @@ export function Search({
           value={searchQuery}
           onChange={onSearchChange}
           onSubmit={onSubmit}
-          onClear={onClear}
           placeholder={placeholder}
         />
       </div>

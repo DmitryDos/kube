@@ -7,7 +7,7 @@ import { AuthPage } from '../../src/components/AuthPage/AuthPage';
 
 export default function MainPage() {
   const pages = [
-    <PlayerPage key="player" videoId="550e8400-e29b-41d4-a716-446655440000" />,
+    <PlayerPage key="player" />,
     <PlaylistsPage key="playlists" />,
     <AuthPage key="auth" />,
   ];

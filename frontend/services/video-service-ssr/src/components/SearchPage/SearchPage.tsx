@@ -97,15 +97,6 @@ export function SearchPage({ onVideoClick, onAuthorClick }: SearchPageProps) {
     setSelectedFilter(filter);
   }, []);
 
-  const handleClear = useCallback(() => {
-    setSearchQuery('');
-    setResults([]);
-    setCurrentPage(1);
-    setHasMore(false);
-    setError(null);
-    setLoadMoreError(null);
-  }, []);
-
   const handleLoadMore = useCallback(() => {
     if (!isLoadingMore && hasMore) {
       performSearch(searchQuery, selectedFilter, currentPage + 1, true, false);
@@ -135,40 +126,31 @@ export function SearchPage({ onVideoClick, onAuthorClick }: SearchPageProps) {
   }, [hasMore, isLoadingMore, currentPage, searchQuery, selectedFilter, performSearch]);
 
   const handleSubmit = useCallback(() => {
-    if (searchQuery.trim() !== '') {
-      performSearch(searchQuery, selectedFilter, 1, false);
-    }
+    // Всегда делаем запрос, даже с пустым запросом
+    performSearch(searchQuery.trim(), selectedFilter, 1, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, selectedFilter]);
 
-  // Выполняем начальный поиск при монтировании
+  // Выполняем начальный поиск при монтировании только один раз с пустым запросом
   useEffect(() => {
     if (!hasInitialSearch) {
       setHasInitialSearch(true);
+      // Делаем автоматический запрос при первой загрузке с пустым запросом
       performSearch('', selectedFilter, 1, false);
-      return;
     }
-  }, [hasInitialSearch, selectedFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasInitialSearch]);
 
-  // Выполняем поиск при изменении запроса или фильтра
+  // Выполняем поиск при изменении фильтра (но не при изменении запроса - только по submit)
   useEffect(() => {
     if (!hasInitialSearch) {
-      return; // Пропускаем, если еще не выполнен начальный поиск
-    }
-
-    if (searchQuery.trim() === '') {
-      // При пустом запросе показываем все результаты
-      performSearch('', selectedFilter, 1, false);
       return;
     }
 
-    const timer = setTimeout(() => {
-      performSearch(searchQuery, selectedFilter, 1, false);
-    }, 300);
-
-    return () => clearTimeout(timer);
+    // Поиск при изменении фильтра делаем всегда, даже с пустым запросом
+    performSearch(searchQuery.trim(), selectedFilter, 1, false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchQuery, selectedFilter, hasInitialSearch]);
+  }, [selectedFilter, hasInitialSearch]);
 
   const filteredResults = results.filter((item) => {
     if (selectedFilter === 'all') return true;
@@ -185,7 +167,6 @@ export function SearchPage({ onVideoClick, onAuthorClick }: SearchPageProps) {
           selectedFilter={selectedFilter}
           onSearchChange={handleSearchChange}
           onFilterChange={handleFilterChange}
-          onClear={handleClear}
           onSubmit={handleSubmit}
         />
       </div>
@@ -204,7 +185,6 @@ export function SearchPage({ onVideoClick, onAuthorClick }: SearchPageProps) {
                 : 'Введите запрос в поле поиска'
             }
             onRetry={() => performSearch(searchQuery, selectedFilter, 1, false)}
-            columns={2}
             gap={12}
           >
             {filteredResults.map((item) => {

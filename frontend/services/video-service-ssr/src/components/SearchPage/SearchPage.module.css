@@ -2,10 +2,10 @@
 .search-page {
   display: flex;
   flex-direction: column;
-  width: 732px;
-  max-width: 100%;
-  margin: 0 auto;
+  width: 100%;
   height: 100vh;
+  margin: 0 auto;
+  padding: 20px;
   overflow: hidden;
 }
 
@@ -39,10 +39,16 @@
   padding: 0;
   border-radius: 12px;
   backdrop-filter: blur(10px);
-  overflow-y: auto;
+  overflow-y: hidden;
   overflow-x: hidden;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* Разрешаем скролл когда на родителе есть класс scroll-enabled */
+:global(.scroll-enabled) :global(.search-page) .search-results,
+:global(.scroll-enabled) .search-results {
+  overflow-y: auto !important;
 }
 
 .search-results::-webkit-scrollbar {
@@ -191,13 +197,6 @@
   border-width: 2px;
 }
 
-/* Media queries for narrow screens */
-@media (max-width: 732px) {
-  .search-page {
-    width: 100%;
-  }
-}
-
 @media (max-width: 768px) {
   .loading,
   .error,
@@ -238,10 +237,6 @@
 
   .search-header {
     padding: 12px;
-  }
-
-  .search-content {
-    padding: 0 12px 12px 12px;
   }
 
   .search-results {

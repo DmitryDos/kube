@@ -7,22 +7,20 @@ import styles from './List.module.css';
 interface ListProps {
   children: ReactNode;
   gap?: number;
-  columns?: number;
   className?: string;
   autoHeight?: boolean;
+  useGrid?: boolean;
 }
 
-export function List({ children, gap = 16, columns, className, autoHeight = false }: ListProps) {
+export function List({ children, gap = 16, className, autoHeight = false, useGrid = true }: ListProps) {
   const gridStyle = { 
-    '--gap': `${gap}px`,
-    '--columns': columns || 'auto'
+    '--gap': `${gap}px`
   } as React.CSSProperties;
 
   return (
     <div 
-      className={`${styles['list']} ${className || ''} ${columns ? styles['list-grid'] : ''} ${autoHeight ? styles['auto-height'] : ''}`}
+      className={`${styles['list']} ${className || ''} ${useGrid ? styles['list-grid'] : ''} ${autoHeight ? styles['auto-height'] : ''}`}
       style={gridStyle}
-      data-columns={columns}
     >
       {children}
     </div>

@@ -16,38 +16,24 @@
   gap: var(--gap, 16px);
   width: 100%;
   justify-items: stretch;
-}
-
-.list-grid[data-columns="2"] {
-  grid-template-columns: repeat(2, 1fr);
-}
-
-.list-grid[data-columns="3"] {
-  grid-template-columns: repeat(3, 1fr);
-}
-
-.list-grid[data-columns="4"] {
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
 }
 
 /* Media queries for narrow screens */
 @media (max-width: 732px) {
-  .list-grid[data-columns="2"],
-  .list-grid[data-columns="3"],
-  .list-grid[data-columns="4"] {
+  .list-grid {
     grid-template-columns: 1fr !important;
   }
 }
-
-/* @media (max-width: 768px) {
-  .list {
-    gap: calc(var(--gap, 16px) * 0.75);
-  }
+/* Для плейлистов на десктопе - фиксированные 2 колонки */
+/* Используем :global() для глобального класса, который применяется вместе с list-grid */
+.list-grid:global(.playlist-grid-desktop) {
+  grid-template-columns: repeat(2, 1fr) !important;
 }
 
-@media (max-width: 480px) {
-  .list {
-    gap: calc(var(--gap, 16px) * 0.5);
+@media (max-width: 732px) {
+  .list-grid:global(.playlist-grid-desktop) {
+    grid-template-columns: 1fr !important;
   }
-} */
+}
 

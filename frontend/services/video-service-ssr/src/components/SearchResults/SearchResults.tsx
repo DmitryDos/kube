@@ -13,8 +13,9 @@ interface SearchResultsProps {
   emptyMessage?: string;
   emptyHint?: string;
   onRetry?: () => void;
-  columns?: number;
   gap?: number;
+  autoHeight?: boolean;
+  listClassName?: string;
 }
 
 export function SearchResults({
@@ -25,8 +26,9 @@ export function SearchResults({
   emptyMessage,
   emptyHint,
   onRetry,
-  columns = 2,
   gap = 12,
+  autoHeight = false,
+  listClassName,
 }: SearchResultsProps) {
   if (isLoading) {
     return (
@@ -76,7 +78,7 @@ export function SearchResults({
   }
 
   return (
-    <List gap={gap} columns={columns} autoHeight={true}>
+    <List gap={gap} autoHeight={autoHeight} className={listClassName}>
       {children}
     </List>
   );

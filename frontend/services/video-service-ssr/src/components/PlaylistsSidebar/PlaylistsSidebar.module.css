@@ -160,16 +160,16 @@
 }
 
 /* Desktop: sidebar всегда видим */
-@media (min-width: 1024px) {
+@media (min-width: 1064px) {
   .sidebar-overlay {
     display: none;
   }
 }
 
 /* Mobile: sidebar скрыт по умолчанию */
-@media (max-width: 1023px) {
+@media (max-width: 1063px) {
   .sidebar {
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0;
     width: 280px;

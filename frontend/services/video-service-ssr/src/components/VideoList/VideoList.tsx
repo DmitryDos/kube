@@ -8,7 +8,6 @@ import styles from './VideoList.module.css';
 
 interface VideoListProps {
   videos: Video[];
-  columns?: number;
   gap?: number;
   onVideoClick?: (video: Video) => void;
   onVideoLongPress?: (video: Video) => void;
@@ -17,7 +16,6 @@ interface VideoListProps {
 
 export function VideoList({
   videos,
-  columns = 2,
   gap = 12,
   onVideoClick,
   onVideoLongPress,
@@ -28,7 +26,7 @@ export function VideoList({
   }
 
   return (
-    <List gap={gap} columns={columns} autoHeight={true}>
+    <List gap={gap} autoHeight={true}>
       {videos.map((video) => (
         <div key={video.id} className={styles['video-wrapper']}>
           {showEditButton && (

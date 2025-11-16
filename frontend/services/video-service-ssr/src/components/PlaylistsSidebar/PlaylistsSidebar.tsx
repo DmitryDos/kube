@@ -45,7 +45,6 @@ export function PlaylistsSidebar({
             <SearchBar
               value={sidebarSearchQuery}
               onChange={setSidebarSearchQuery}
-              onClear={() => setSidebarSearchQuery('')}
               placeholder="Поиск плейлистов"
             />
           </div>
