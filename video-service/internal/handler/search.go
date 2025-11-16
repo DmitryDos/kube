@@ -159,48 +159,9 @@ func (h *SearchHandler) SearchVideosAndAuthors(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// searchAuthors - заглушка для поиска авторов (нужно реализовать)
+// searchAuthors - поиск авторов (нужно реализовать)
 func (h *SearchHandler) searchAuthors(query string, limit, offset int) ([]gin.H, error) {
 	// TODO: Реализовать поиск авторов из базы данных
-	// Пока возвращаем заглушку
-
-	authors := []gin.H{
-		{
-			"id":           "1",
-			"title":        "Иван Иванов",
-			"subtitle":     "Создатель образовательного контента",
-			"imageURL":     "https://example.com/avatar1.jpg",
-			"videoCount":   42,
-			"followerCount": 1500,
-		},
-		{
-			"id":           "2",
-			"title":        "Мария Петрова",
-			"subtitle":     "Эксперт в дизайне интерфейсов",
-			"imageURL":     "https://example.com/avatar2.jpg",
-			"videoCount":   28,
-			"followerCount": 890,
-		},
-	}
-
-	// Фильтрация по query если есть
-	if query != "" {
-		filtered := make([]gin.H, 0)
-		for _, author := range authors {
-			if name, ok := author["title"].(string); ok {
-				if containsIgnoreCase(name, query) {
-					filtered = append(filtered, author)
-				}
-			}
-		}
-		return filtered, nil
-	}
-
-	return authors, nil
-}
-
-// Вспомогательная функция для поиска без учета регистра
-func containsIgnoreCase(s, substr string) bool {
-	// Простая реализация - в продакшене используйте strings.Contains с strings.ToLower
-	return len(s) >= len(substr)
+	// Пока возвращаем пустой массив
+	return []gin.H{}, nil
 }

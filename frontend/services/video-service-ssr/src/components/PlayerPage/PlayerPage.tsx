@@ -181,7 +181,7 @@ export function PlayerPage({ videoId: initialVideoId, onVideoClick, onAuthorClic
         page.scrollTop += e.deltaY;
         e.preventDefault();
         e.stopPropagation();
-      }
+  }
     };
 
     // Функция для добавления обработчика
@@ -191,7 +191,7 @@ export function PlayerPage({ videoId: initialVideoId, onVideoClick, onAuthorClic
         searchResults.addEventListener('wheel', handleSearchResultsWheel, { passive: false });
         return searchResults;
       }
-      return null;
+    return null;
     };
 
     // Используем MutationObserver для отслеживания изменений в SearchPage
@@ -201,7 +201,7 @@ export function PlayerPage({ videoId: initialVideoId, onVideoClick, onAuthorClic
       if (searchResults && !searchResults.hasAttribute('data-wheel-handler')) {
         searchResults.setAttribute('data-wheel-handler', 'true');
         searchResults.addEventListener('wheel', handleSearchResultsWheel, { passive: false });
-      }
+        }
     });
 
     // Наблюдаем за изменениями в searchContainer
@@ -259,11 +259,11 @@ export function PlayerPage({ videoId: initialVideoId, onVideoClick, onAuthorClic
           <div data-embedded="true">
             <SearchPage
               onVideoClick={handleVideoClick}
-              onAuthorClick={onAuthorClick}
-            />
+                onAuthorClick={onAuthorClick}
+              />
+            </div>
           </div>
         </div>
-      </div>
     </div>
   );
 }

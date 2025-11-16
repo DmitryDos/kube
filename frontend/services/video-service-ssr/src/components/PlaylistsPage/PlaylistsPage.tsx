@@ -15,26 +15,8 @@ interface PlaylistsPageProps {
   onVideoClick?: (video: Video) => void;
 }
 
-// Моковые данные для начала
-const mockPlaylists: Playlist[] = [
-  {
-    id: '1',
-    name: 'Избранное',
-    isSystem: true,
-    videoIds: ['550e8400-e29b-41d4-a716-446655440000', '550e8400-e29b-41d4-a716-446655440002'],
-    order: 0,
-  },
-  {
-    id: '2',
-    name: 'Мой плейлист',
-    isSystem: false,
-    videoIds: ['550e8400-e29b-41d4-a716-446655440004'],
-    order: 1,
-  },
-];
-
 export function PlaylistsPage({ onVideoClick }: PlaylistsPageProps) {
-  const [playlists, setPlaylists] = useState<Playlist[]>(mockPlaylists);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingPlaylistId, setEditingPlaylistId] = useState<string | null>(null);

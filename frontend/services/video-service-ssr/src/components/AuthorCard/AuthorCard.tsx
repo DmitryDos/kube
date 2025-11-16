@@ -13,10 +13,19 @@ interface AuthorCardProps {
 export function AuthorCard({ author, onClick }: AuthorCardProps) {
   const displayName = author.name || author.title || 'Автор';
   
+  // Проверяем валидность URL для аватара
+  const avatarUrl = author.avatar_url || author.imageURL;
+  const isValidAvatarUrl = avatarUrl && (
+    avatarUrl.startsWith('http://') || 
+    avatarUrl.startsWith('https://') || 
+    avatarUrl.startsWith('/') ||
+    avatarUrl.startsWith('data:')
+  );
+  
   const authorVideo = {
     id: author.id,
     title: displayName,
-    thumbnail_url: author.avatar_url || author.imageURL,
+    thumbnail_url: isValidAvatarUrl ? avatarUrl : undefined,
   } as any;
 
   return (
