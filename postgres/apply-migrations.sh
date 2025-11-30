@@ -25,9 +25,12 @@ if [ -d "$MIGRATIONS_DIR" ]; then
   for migration in $(ls -1 "$MIGRATIONS_DIR"/*.sql 2>/dev/null | sort); do
     if [ -f "$migration" ]; then
       echo "Applying migration: $(basename $migration)"
-      psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h "$POSTGRES_HOST" -f "$migration" || {
-        echo "Warning: Migration $(basename $migration) failed or already applied"
-      }
+      if psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h "$POSTGRES_HOST" -f "$migration"; then
+        echo "Migration $(basename $migration) applied successfully"
+      else
+        echo "ERROR: Migration $(basename $migration) failed!"
+        exit 1
+      fi
     fi
   done
 fi
