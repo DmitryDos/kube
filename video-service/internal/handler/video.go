@@ -144,7 +144,7 @@ func (h *VideoHandler) UploadVideoRaw(c *gin.Context) {
 			Description:  video.Description,
 			UserID:       video.UserID,
 			FileSize:     video.FileSize,
-			FileURL:      presignedURL,
+			FileURL:      fileURL,
 			ThumbnailURL: thumbnailURL,
 			Status:       video.Status,
 			Duration:     duration,

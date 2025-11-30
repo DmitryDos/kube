@@ -2,10 +2,8 @@ package handler
 
 import (
 	"fmt"
-	"io"
+	"log"
 	"net/http"
-	"strconv"
-	"time"
 	"video-service/internal/model"
 	"video-service/internal/service"
 
@@ -17,7 +15,7 @@ type MediaHandler struct {
 	videoService *service.VideoService
 }
 
-func NewMediaHandler(videoService *service.VideoService, imageService *service.ImageService) *MediaHandler {
+func NewMediaHandler(videoService *service.VideoService, _ *service.ImageService) *MediaHandler {
 	return &MediaHandler{
 		videoService: videoService,
 	}
@@ -143,22 +141,28 @@ func (h *MediaHandler) UploadPhoto(c *gin.Context) {
 		thumbnailURL = fmt.Sprintf("/api/videos/%s/thumbnail", video.ID.String())
 	}
 
+	log.Printf("[UploadPhoto] Photo uploaded - ID: %s, ThumbnailPath: %v, ThumbnailURL: %s", video.ID.String(), video.ThumbnailPath, thumbnailURL)
+
+	response := model.VideoResponse{
+		ID:           video.ID,
+		Title:        video.Title,
+		Description:  video.Description,
+		UserID:       video.UserID,
+		FileSize:     video.FileSize,
+		FileURL:      "", // Фото не имеют file_url
+		ThumbnailURL: thumbnailURL,
+		Status:       video.Status,
+		Duration:     0, // Фото не имеют duration
+		ContentType:  "image",
+		IsPrivate:    video.IsPrivate,
+		CreatedAt:    video.CreatedAt,
+	}
+
+	log.Printf("[UploadPhoto] Response - ThumbnailURL: %s", response.ThumbnailURL)
+
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Photo uploaded successfully",
-		"photo": model.VideoResponse{
-			ID:           video.ID,
-			Title:        video.Title,
-			Description:  video.Description,
-			UserID:       video.UserID,
-			FileSize:     video.FileSize,
-			FileURL:      "", // Фото не имеют file_url
-			ThumbnailURL: thumbnailURL,
-			Status:       video.Status,
-			Duration:     0, // Фото не имеют duration
-			ContentType:  "image",
-			IsPrivate:    video.IsPrivate,
-			CreatedAt:    video.CreatedAt,
-		},
+		"photo": response,
 	})
 }
 
