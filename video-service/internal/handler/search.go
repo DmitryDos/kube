@@ -179,25 +179,40 @@ func (h *SearchHandler) SearchVideosAndAuthors(c *gin.Context) {
 		}
 
 	case "photos":
-		// Только фото
+		// Только фото - возвращаем как VideoResponse с thumbnail_url
 		var currentUserID *uuid.UUID
 		if uid, ok := c.Get("userID"); ok {
 			if v, ok2 := uid.(uuid.UUID); ok2 {
 				currentUserID = &v
 			}
 		}
-		photos, err := h.imageService.GetAllImagesPaginated(q, nil, currentUserID, page-1, limit)
+		images, err := h.imageService.GetAllImagesPaginated(q, nil, currentUserID, page-1, limit)
 		if err != nil {
 			log.Printf("[SearchHandler] Error searching photos: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search photos"})
 			return
 		}
 
-		photoResults := make([]gin.H, len(photos))
-		for i, photo := range photos {
+		// Конвертируем ImageResponse в VideoResponse
+		photoResults := make([]gin.H, len(images))
+		for i, img := range images {
+			videoResponse := model.VideoResponse{
+				ID:           img.ID,
+				Title:        img.Title,
+				Description:  img.Description,
+				UserID:       img.UserID,
+				FileSize:     img.FileSize,
+				FileURL:      "", // Фото не имеют file_url
+				ThumbnailURL: img.ImageURL, // Используем image_url как thumbnail_url
+				Status:       img.Status,
+				Duration:     0, // Фото не имеют duration
+				ContentType:  "image",
+				IsPrivate:    img.IsPrivate,
+				CreatedAt:    img.CreatedAt,
+			}
 			photoResults[i] = gin.H{
 				"type": "photo",
-				"data": photo,
+				"data": videoResponse,
 			}
 		}
 
@@ -206,7 +221,7 @@ func (h *SearchHandler) SearchVideosAndAuthors(c *gin.Context) {
 			"pagination": gin.H{
 				"page":  page,
 				"limit": limit,
-				"total": len(photos),
+				"total": len(images),
 			},
 		}
 
