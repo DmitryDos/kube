@@ -60,8 +60,11 @@ func main() {
     log.Println("MinIO connected")
 
     videoRepo := repository.NewVideoRepository(db)
+    imageRepo := repository.NewImageRepository(db)
     videoService := service.NewVideoService(videoRepo, minioClient)
+    imageService := service.NewImageService(imageRepo, minioClient)
     videoHandler := handler.NewVideoHandler(videoService)
+    mediaHandler := handler.NewMediaHandler(videoService, imageService)
     searchHandler := handler.NewSearchHandler(videoService)
     healthHandler := handler.NewHealthHandler()
 
@@ -82,6 +85,14 @@ func main() {
                 videosGroup.PUT("/:id", videoHandler.UpdateVideoMetadata)
                 videosGroup.PATCH("/:id", videoHandler.UpdateVideoMetadata)
                 videosGroup.DELETE("/:id", videoHandler.DeleteVideo)
+            }
+            
+            mediaGroup := protected.Group("")
+            {
+                mediaGroup.POST("/music/upload", mediaHandler.UploadAudio)
+                mediaGroup.POST("/photos/upload", mediaHandler.UploadPhoto)
+                mediaGroup.PUT("/photos/:id", mediaHandler.UpdatePhotoMetadata)
+                mediaGroup.PATCH("/photos/:id", mediaHandler.UpdatePhotoMetadata)
             }
         }
 

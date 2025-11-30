@@ -28,6 +28,18 @@ func NewVideoService(repo *repository.VideoRepository, storage *storage.MinIOCli
 }
 
 func (s *VideoService) CreateVideoFile(userID uuid.UUID, fileHeader *model.FileHeader) (*model.Video, error) {
+    return s.CreateMediaFile(userID, fileHeader, "video")
+}
+
+func (s *VideoService) CreateAudioFile(userID uuid.UUID, fileHeader *model.FileHeader) (*model.Video, error) {
+    return s.CreateMediaFile(userID, fileHeader, "audio")
+}
+
+func (s *VideoService) CreateMediaFile(userID uuid.UUID, fileHeader *model.FileHeader, contentType string) (*model.Video, error) {
+    // contentType должен быть "video" или "audio", не "image"
+    if contentType == "image" {
+        return nil, fmt.Errorf("use ImageService for images")
+    }
     tempDir := filepath.Join("temp", userID.String())
     if err := os.MkdirAll(tempDir, 0755); err != nil {
         return nil, err
@@ -48,7 +60,13 @@ func (s *VideoService) CreateVideoFile(userID uuid.UUID, fileHeader *model.FileH
     }
 
     ctx := context.Background()
-    objectName := fmt.Sprintf("user-%s/%s", userID.String(), fileName)
+    var objectName string
+    if contentType == "audio" {
+        objectName = fmt.Sprintf("user-%s/audio/%s", userID.String(), fileName)
+    } else {
+        objectName = fmt.Sprintf("user-%s/video/%s", userID.String(), fileName)
+    }
+    
     if err := s.storage.UploadFile(ctx, objectName, tempFilePath, fileHeader.Size); err != nil {
         os.Remove(tempFilePath)
         return nil, err
@@ -61,9 +79,11 @@ func (s *VideoService) CreateVideoFile(userID uuid.UUID, fileHeader *model.FileH
         FilePath:     objectName,
         FileSize:     fileHeader.Size,
         ThumbnailPath: sql.NullString{},
+        ImageID:      sql.NullString{},
+        ContentType:  contentType,
         UserID:       userID,
         Status:       "ready",
-        IsPrivate:    false, // По умолчанию видео публичное
+        IsPrivate:    false,
     }
 
     if err := s.repo.Create(video); err != nil {
@@ -87,7 +107,7 @@ func (s *VideoService) GetUserVideosPaginated(userID uuid.UUID, page, pageSize i
     ctx := context.Background()
 
     for _, video := range videos {
-        fileURL, err := s.storage.GeneratePresignedURL(ctx, video.FilePath)
+        fileURL, err := s.storage.GetPresignedURL(ctx, video.FilePath, 24*time.Hour)
         if err != nil {
             fileURL = ""
         }
@@ -130,7 +150,7 @@ func (s *VideoService) GetAllVideosPaginated(query string, userID *uuid.UUID, cu
     ctx := context.Background()
 
     for _, video := range videos {
-        fileURL, err := s.storage.GeneratePresignedURL(ctx, video.FilePath)
+        fileURL, err := s.storage.GetPresignedURL(ctx, video.FilePath, 24*time.Hour)
         if err != nil {
             fileURL = ""
         }
@@ -183,7 +203,7 @@ func (s *VideoService) GetVideoPublic(videoID uuid.UUID) (*model.Video, error) {
 }
 
 func (s *VideoService) GetVideoStreamURL(ctx context.Context, objectName string) (string, error) {
-    return s.storage.GeneratePresignedURL(ctx, objectName)
+    return s.storage.GetPresignedURL(ctx, objectName, 24*time.Hour)
 }
 
 func (s *VideoService) StatObject(ctx context.Context, objectName string) (int64, string, error) {
@@ -251,6 +271,8 @@ func (s *VideoService) CreateVideoStream(userID uuid.UUID, reader io.Reader, fil
         FilePath:     objectName,
         FileSize:     finalSize,
         ThumbnailPath: sql.NullString{},
+        ImageID:      sql.NullString{},
+        ContentType:  "video",
         UserID:       userID,
         Status:       "ready",
         IsPrivate:    false, // По умолчанию видео публичное

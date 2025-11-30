@@ -1,6 +1,7 @@
 package storage
 
 import (
+    "bytes"
     "context"
     "io"
     "net/url"
@@ -65,8 +66,13 @@ func (m *MinIOClient) UploadReader(ctx context.Context, objectName string, reade
     return info.Size, nil
 }
 
-func (m *MinIOClient) GeneratePresignedURL(ctx context.Context, objectName string) (string, error) {
-    expires := 24 * 60 * 60 * time.Second
+func (m *MinIOClient) UploadBytes(ctx context.Context, objectName string, data []byte) error {
+    reader := bytes.NewReader(data)
+    _, err := m.UploadReader(ctx, objectName, reader, int64(len(data)), "application/octet-stream")
+    return err
+}
+
+func (m *MinIOClient) GetPresignedURL(ctx context.Context, objectName string, expires time.Duration) (string, error) {
     url, err := m.client.PresignedGetObject(ctx, m.bucket, objectName, expires, nil)
     if err != nil {
         return "", err

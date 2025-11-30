@@ -20,8 +20,8 @@ func NewVideoRepository(db *sql.DB) *VideoRepository {
 
 func (r *VideoRepository) Create(video *model.Video) error {
 	query := `
-		INSERT INTO videos (id, title, description, file_path, file_size, thumbnail_path, user_id, status, is_private)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO videos (id, title, description, file_path, file_size, thumbnail_path, image_id, content_type, user_id, status, is_private)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 		RETURNING created_at, updated_at
 	`
 
@@ -32,6 +32,18 @@ func (r *VideoRepository) Create(video *model.Video) error {
 		thumbnailPath = nil
 	}
 
+	var imageID interface{}
+	if video.ImageID.Valid {
+		imageID = video.ImageID.String
+	} else {
+		imageID = nil
+	}
+
+	contentType := video.ContentType
+	if contentType == "" {
+		contentType = "video" // По умолчанию видео
+	}
+
 	return r.db.QueryRow(
 		query,
 		video.ID,
@@ -40,6 +52,8 @@ func (r *VideoRepository) Create(video *model.Video) error {
 		video.FilePath,
 		video.FileSize,
 		thumbnailPath,
+		imageID,
+		contentType,
 		video.UserID,
 		video.Status,
 		video.IsPrivate,
@@ -52,7 +66,7 @@ func (r *VideoRepository) FindByUserID(userID uuid.UUID) ([]model.Video, error) 
 
 func (r *VideoRepository) FindByUserIDPaginated(userID uuid.UUID, page, pageSize int) ([]model.Video, error) {
 	query := `
-		SELECT id, title, description, file_path, file_size, duration, thumbnail_path, user_id, status, is_private, created_at, updated_at
+		SELECT id, title, description, file_path, file_size, duration, thumbnail_path, image_id, content_type, user_id, status, is_private, created_at, updated_at
 		FROM videos
 		WHERE user_id = $1
 		ORDER BY created_at DESC
@@ -83,6 +97,8 @@ func (r *VideoRepository) FindByUserIDPaginated(userID uuid.UUID, page, pageSize
 			&video.FileSize,
 			&video.Duration,
 			&video.ThumbnailPath,
+			&video.ImageID,
+			&video.ContentType,
 			&video.UserID,
 			&video.Status,
 			&video.IsPrivate,
@@ -100,7 +116,7 @@ func (r *VideoRepository) FindByUserIDPaginated(userID uuid.UUID, page, pageSize
 
 func (r *VideoRepository) FindByID(id uuid.UUID) (*model.Video, error) {
 	query := `
-		SELECT id, title, description, file_path, file_size, duration, thumbnail_path, user_id, status, is_private, created_at, updated_at
+		SELECT id, title, description, file_path, file_size, duration, thumbnail_path, image_id, content_type, user_id, status, is_private, created_at, updated_at
 		FROM videos
 		WHERE id = $1
 	`
@@ -135,6 +151,8 @@ func (r *VideoRepository) FindByID(id uuid.UUID) (*model.Video, error) {
 		&video.FileSize,
 		&video.Duration,
 		&video.ThumbnailPath,
+		&video.ImageID,
+		&video.ContentType,
 		&video.UserID,
 		&video.Status,
 		&video.IsPrivate,
@@ -213,7 +231,7 @@ func (r *VideoRepository) UpdateMetadata(videoID uuid.UUID, title *string, descr
 
 func (r *VideoRepository) FindAllPaginatedWithSearch(query string, userID *uuid.UUID, currentUserID *uuid.UUID, page, pageSize int) ([]model.Video, error) {
 	base := `
-		SELECT id, title, description, file_path, file_size, duration, thumbnail_path, user_id, status, is_private, created_at, updated_at
+		SELECT id, title, description, file_path, file_size, duration, thumbnail_path, image_id, content_type, user_id, status, is_private, created_at, updated_at
 		FROM videos
 	`
 	where := ""
@@ -282,6 +300,8 @@ func (r *VideoRepository) FindAllPaginatedWithSearch(query string, userID *uuid.
 			&video.FileSize,
 			&video.Duration,
 			&video.ThumbnailPath,
+			&video.ImageID,
+			&video.ContentType,
 			&video.UserID,
 			&video.Status,
 			&video.IsPrivate,
