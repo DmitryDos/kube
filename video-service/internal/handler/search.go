@@ -14,13 +14,11 @@ import (
 
 type SearchHandler struct {
 	videoService *service.VideoService
-	imageService *service.ImageService
 }
 
 func NewSearchHandler(videoService *service.VideoService, imageService *service.ImageService) *SearchHandler {
 	return &SearchHandler{
 		videoService: videoService,
-		imageService: imageService,
 	}
 }
 
@@ -179,40 +177,45 @@ func (h *SearchHandler) SearchVideosAndAuthors(c *gin.Context) {
 		}
 
 	case "photos":
-		// Только фото - возвращаем как VideoResponse с thumbnail_url
+		// Только фото (content_type = 'image')
 		var currentUserID *uuid.UUID
 		if uid, ok := c.Get("userID"); ok {
 			if v, ok2 := uid.(uuid.UUID); ok2 {
 				currentUserID = &v
 			}
 		}
-		images, err := h.imageService.GetAllImagesPaginated(q, nil, currentUserID, page-1, limit)
+		// Получаем все видео/фото, затем фильтруем для image
+		allVideos, err := h.videoService.GetAllVideosPaginated(q, nil, currentUserID, page-1, limit*2) // Fetch more to filter
 		if err != nil {
 			log.Printf("[SearchHandler] Error searching photos: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search photos"})
 			return
 		}
 
-		// Конвертируем ImageResponse в VideoResponse
-		photoResults := make([]gin.H, len(images))
-		for i, img := range images {
-			videoResponse := model.VideoResponse{
-				ID:           img.ID,
-				Title:        img.Title,
-				Description:  img.Description,
-				UserID:       img.UserID,
-				FileSize:     img.FileSize,
-				FileURL:      "", // Фото не имеют file_url
-				ThumbnailURL: img.ImageURL, // Используем image_url как thumbnail_url
-				Status:       img.Status,
-				Duration:     0, // Фото не имеют duration
-				ContentType:  "image",
-				IsPrivate:    img.IsPrivate,
-				CreatedAt:    img.CreatedAt,
+		var photos []model.VideoResponse
+		for _, v := range allVideos {
+			if v.ContentType == "image" {
+				photos = append(photos, v)
 			}
+		}
+
+		// Apply pagination
+		start := (page - 1) * limit
+		end := start + limit
+		if end > len(photos) {
+			end = len(photos)
+		}
+		if start < len(photos) {
+			photos = photos[start:end]
+		} else {
+			photos = []model.VideoResponse{}
+		}
+
+		photoResults := make([]gin.H, len(photos))
+		for i, photo := range photos {
 			photoResults[i] = gin.H{
 				"type": "photo",
-				"data": videoResponse,
+				"data": photo,
 			}
 		}
 
@@ -221,7 +224,7 @@ func (h *SearchHandler) SearchVideosAndAuthors(c *gin.Context) {
 			"pagination": gin.H{
 				"page":  page,
 				"limit": limit,
-				"total": len(images),
+				"total": len(photos),
 			},
 		}
 

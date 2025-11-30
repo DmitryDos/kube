@@ -63,12 +63,9 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
 		return
 	}
 
-	ctx := c.Request.Context()
-	presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
-	if err != nil {
-		h.service.DeleteVideo(userIDUUID, video.ID)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate stream URL"})
-		return
+	var fileURL string
+	if video.FilePath != "" {
+		fileURL = fmt.Sprintf("/api/videos/%s/stream", video.ID.String())
 	}
 
 	var thumbnailURL string
@@ -89,7 +86,7 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
 			Description:  video.Description,
 			UserID:       video.UserID,
 			FileSize:     video.FileSize,
-			FileURL:      presignedURL,
+			FileURL:      fileURL,
 			ThumbnailURL: thumbnailURL,
 			Status:       video.Status,
 			Duration:     duration,
@@ -124,12 +121,9 @@ func (h *VideoHandler) UploadVideoRaw(c *gin.Context) {
 
 	c.Writer.Header().Add("X-Uploaded-Video-ID", video.ID.String())
 
-	ctx := c.Request.Context()
-	presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
-	if err != nil {
-		h.service.DeleteVideo(userIDUUID, video.ID)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate stream URL"})
-		return
+	var fileURL string
+	if video.FilePath != "" {
+		fileURL = fmt.Sprintf("/api/videos/%s/stream", video.ID.String())
 	}
 
 	var thumbnailURL string

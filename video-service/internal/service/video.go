@@ -35,11 +35,11 @@ func (s *VideoService) CreateAudioFile(userID uuid.UUID, fileHeader *model.FileH
     return s.CreateMediaFile(userID, fileHeader, "audio")
 }
 
+func (s *VideoService) CreateImageFile(userID uuid.UUID, fileHeader *model.FileHeader) (*model.Video, error) {
+    return s.CreateMediaFile(userID, fileHeader, "image")
+}
+
 func (s *VideoService) CreateMediaFile(userID uuid.UUID, fileHeader *model.FileHeader, contentType string) (*model.Video, error) {
-    // contentType должен быть "video" или "audio", не "image"
-    if contentType == "image" {
-        return nil, fmt.Errorf("use ImageService for images")
-    }
     tempDir := filepath.Join("temp", userID.String())
     if err := os.MkdirAll(tempDir, 0755); err != nil {
         return nil, err
@@ -61,10 +61,22 @@ func (s *VideoService) CreateMediaFile(userID uuid.UUID, fileHeader *model.FileH
 
     ctx := context.Background()
     var objectName string
-    if contentType == "audio" {
+    var thumbnailPath sql.NullString
+    var filePath string
+    
+    if contentType == "image" {
+        // Для фото: сохраняем в thumbnails, file_path пустой
+        objectName = fmt.Sprintf("user-%s/thumbnails/%s", userID.String(), fileName)
+        thumbnailPath = sql.NullString{String: objectName, Valid: true}
+        filePath = "" // Пустой для фото
+    } else if contentType == "audio" {
         objectName = fmt.Sprintf("user-%s/audio/%s", userID.String(), fileName)
+        filePath = objectName
+        thumbnailPath = sql.NullString{}
     } else {
         objectName = fmt.Sprintf("user-%s/video/%s", userID.String(), fileName)
+        filePath = objectName
+        thumbnailPath = sql.NullString{}
     }
     
     if err := s.storage.UploadFile(ctx, objectName, tempFilePath, fileHeader.Size); err != nil {
@@ -76,9 +88,9 @@ func (s *VideoService) CreateMediaFile(userID uuid.UUID, fileHeader *model.FileH
         ID:           uuid.New(),
         Title:        "",
         Description:  "",
-        FilePath:     objectName,
+        FilePath:     filePath,
         FileSize:     fileHeader.Size,
-        ThumbnailPath: sql.NullString{},
+        ThumbnailPath: thumbnailPath,
         ImageID:      sql.NullString{},
         ContentType:  contentType,
         UserID:       userID,
@@ -104,12 +116,11 @@ func (s *VideoService) GetUserVideosPaginated(userID uuid.UUID, page, pageSize i
     }
 
     var response []model.VideoResponse
-    ctx := context.Background()
 
     for _, video := range videos {
-        fileURL, err := s.storage.GetPresignedURL(ctx, video.FilePath, 24*time.Hour)
-        if err != nil {
-            fileURL = ""
+        var fileURL string
+        if video.FilePath != "" {
+            fileURL = fmt.Sprintf("/api/videos/%s/stream", video.ID.String())
         }
 
         var thumbnailURL string
@@ -147,12 +158,11 @@ func (s *VideoService) GetAllVideosPaginated(query string, userID *uuid.UUID, cu
     }
 
     var response []model.VideoResponse
-    ctx := context.Background()
 
     for _, video := range videos {
-        fileURL, err := s.storage.GetPresignedURL(ctx, video.FilePath, 24*time.Hour)
-        if err != nil {
-            fileURL = ""
+        var fileURL string
+        if video.FilePath != "" {
+            fileURL = fmt.Sprintf("/api/videos/%s/stream", video.ID.String())
         }
 
         var thumbnailURL string

@@ -165,3 +165,19 @@ func (s *ImageService) GetAllImagesPaginated(query string, userID *uuid.UUID, cu
 	return response, nil
 }
 
+func (s *ImageService) StatObject(ctx context.Context, objectName string) (int64, string, error) {
+	info, err := s.storage.Stat(ctx, objectName)
+	if err != nil {
+		return 0, "", err
+	}
+	return info.Size, info.ContentType, nil
+}
+
+func (s *ImageService) GetObjectRange(ctx context.Context, objectName string, start, end int64) (io.ReadCloser, error) {
+	obj, err := s.storage.GetObjectRange(ctx, objectName, start, end)
+	if err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+

@@ -60,12 +60,10 @@ func main() {
     log.Println("MinIO connected")
 
     videoRepo := repository.NewVideoRepository(db)
-    imageRepo := repository.NewImageRepository(db)
     videoService := service.NewVideoService(videoRepo, minioClient)
-    imageService := service.NewImageService(imageRepo, minioClient)
     videoHandler := handler.NewVideoHandler(videoService)
-    mediaHandler := handler.NewMediaHandler(videoService, imageService)
-    searchHandler := handler.NewSearchHandler(videoService, imageService)
+    mediaHandler := handler.NewMediaHandler(videoService, nil)
+    searchHandler := handler.NewSearchHandler(videoService, nil)
     healthHandler := handler.NewHealthHandler()
 
     r := gin.Default()
