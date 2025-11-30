@@ -44,6 +44,8 @@ func (r *VideoRepository) Create(video *model.Video) error {
 		contentType = "video" // По умолчанию видео
 	}
 
+	log.Printf("[VideoRepository.Create] Video.ContentType from model: %q, using contentType: %q, ID: %s", video.ContentType, contentType, video.ID.String())
+
 	return r.db.QueryRow(
 		query,
 		video.ID,

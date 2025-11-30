@@ -98,6 +98,8 @@ func (s *VideoService) CreateMediaFile(userID uuid.UUID, fileHeader *model.FileH
         IsPrivate:    false,
     }
 
+    log.Printf("[CreateMediaFile] Creating video with ContentType: %s, ID: %s", video.ContentType, video.ID.String())
+
     if err := s.repo.Create(video); err != nil {
         ctx := context.Background()
         s.storage.DeleteFile(ctx, objectName)
@@ -143,6 +145,7 @@ func (s *VideoService) GetUserVideosPaginated(userID uuid.UUID, page, pageSize i
             ThumbnailURL: thumbnailURL,
             Status:       video.Status,
             Duration:     duration,
+            ContentType:  video.ContentType,
             IsPrivate:    video.IsPrivate,
             CreatedAt:    video.CreatedAt,
         })
@@ -185,6 +188,7 @@ func (s *VideoService) GetAllVideosPaginated(query string, userID *uuid.UUID, cu
             ThumbnailURL: thumbnailURL,
             Status:       video.Status,
             Duration:     duration,
+            ContentType:  video.ContentType,
             IsPrivate:    video.IsPrivate,
             CreatedAt:    video.CreatedAt,
         })
