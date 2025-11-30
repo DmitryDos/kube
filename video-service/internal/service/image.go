@@ -109,3 +109,59 @@ func (s *ImageService) GetImageByID(imageID uuid.UUID) (*model.Image, error) {
 	return s.repo.FindByID(imageID)
 }
 
+func (s *ImageService) GetAllImagesPaginated(query string, userID *uuid.UUID, currentUserID *uuid.UUID, page, pageSize int) ([]model.ImageResponse, error) {
+	images, err := s.repo.FindAllPaginatedWithSearch(query, userID, currentUserID, page, pageSize)
+	if err != nil {
+		return nil, err
+	}
+
+	var response []model.ImageResponse
+	ctx := context.Background()
+
+	for _, image := range images {
+		imageURL, err := s.storage.GetPresignedURL(ctx, image.ImagePath, 24*time.Hour)
+		if err != nil {
+			imageURL = ""
+		}
+
+		var title string
+		if image.Title.Valid {
+			title = image.Title.String
+		}
+
+		var author string
+		if image.Author.Valid {
+			author = image.Author.String
+		}
+
+		var description string
+		if image.Description.Valid {
+			description = image.Description.String
+		}
+
+		var publishedDate *time.Time
+		if image.PublishedDate.Valid {
+			publishedDate = &image.PublishedDate.Time
+		}
+
+		response = append(response, model.ImageResponse{
+			ID:            image.ID,
+			Title:         title,
+			ImageURL:      imageURL,
+			Width:         image.Width,
+			Height:        image.Height,
+			UserID:        image.UserID,
+			FileSize:      image.FileSize,
+			Author:        author,
+			Description:   description,
+			Tags:          []string(image.Tags),
+			Status:        image.Status,
+			IsPrivate:     image.IsPrivate,
+			PublishedDate: publishedDate,
+			CreatedAt:     image.CreatedAt,
+		})
+	}
+
+	return response, nil
+}
+

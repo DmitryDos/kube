@@ -45,6 +45,7 @@ type VideoResponse struct {
 	ThumbnailURL string    `json:"thumbnail_url,omitempty"`
 	Status       string    `json:"status"`
 	Duration     float64   `json:"duration"`
+	ContentType  string    `json:"content_type,omitempty"`
 	IsPrivate    bool      `json:"is_private"`
 	CreatedAt    time.Time `json:"created_at"`
 }

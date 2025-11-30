@@ -65,7 +65,7 @@ func main() {
     imageService := service.NewImageService(imageRepo, minioClient)
     videoHandler := handler.NewVideoHandler(videoService)
     mediaHandler := handler.NewMediaHandler(videoService, imageService)
-    searchHandler := handler.NewSearchHandler(videoService)
+    searchHandler := handler.NewSearchHandler(videoService, imageService)
     healthHandler := handler.NewHealthHandler()
 
     r := gin.Default()

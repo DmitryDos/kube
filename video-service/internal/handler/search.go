@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"video-service/internal/model"
 	"video-service/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -13,10 +14,14 @@ import (
 
 type SearchHandler struct {
 	videoService *service.VideoService
+	imageService *service.ImageService
 }
 
-func NewSearchHandler(videoService *service.VideoService) *SearchHandler {
-	return &SearchHandler{videoService: videoService}
+func NewSearchHandler(videoService *service.VideoService, imageService *service.ImageService) *SearchHandler {
+	return &SearchHandler{
+		videoService: videoService,
+		imageService: imageService,
+	}
 }
 
 // SearchVideosAndAuthors возвращает объединенные результаты поиска
@@ -69,25 +74,46 @@ func (h *SearchHandler) SearchVideosAndAuthors(c *gin.Context) {
 		}
 
 	case "videos":
-		// Только видео
+		// Только видео (content_type = 'video' или пустой)
 		var currentUserID *uuid.UUID
 		if uid, ok := c.Get("userID"); ok {
 			if v, ok2 := uid.(uuid.UUID); ok2 {
 				currentUserID = &v
 			}
 		}
-		videos, err := h.videoService.GetAllVideosPaginated(q, nil, currentUserID, page-1, limit)
+		allVideos, err := h.videoService.GetAllVideosPaginated(q, nil, currentUserID, page-1, limit*2)
 		if err != nil {
 			log.Printf("[SearchHandler] Error searching videos: %v", err)
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search videos"})
 			return
 		}
 
+		// Фильтруем только видео
+		var videos []model.VideoResponse
+		for _, v := range allVideos {
+			contentType := v.ContentType
+			if contentType == "" || contentType == "video" {
+				videos = append(videos, v)
+			}
+		}
+
+		// Применяем пагинацию
+		start := (page - 1) * limit
+		end := start + limit
+		if end > len(videos) {
+			end = len(videos)
+		}
+		if start < len(videos) {
+			videos = videos[start:end]
+		} else {
+			videos = []model.VideoResponse{}
+		}
+
 		videoResults := make([]gin.H, len(videos))
 		for i, video := range videos {
 			videoResults[i] = gin.H{
-				"type":  "video",
-				"data":  video,
+				"type": "video",
+				"data": video,
 			}
 		}
 
@@ -100,8 +126,92 @@ func (h *SearchHandler) SearchVideosAndAuthors(c *gin.Context) {
 			},
 		}
 
+	case "music":
+		// Только музыка (content_type = 'audio')
+		var currentUserID *uuid.UUID
+		if uid, ok := c.Get("userID"); ok {
+			if v, ok2 := uid.(uuid.UUID); ok2 {
+				currentUserID = &v
+			}
+		}
+		allVideos, err := h.videoService.GetAllVideosPaginated(q, nil, currentUserID, page-1, limit*2)
+		if err != nil {
+			log.Printf("[SearchHandler] Error searching music: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search music"})
+			return
+		}
+
+		// Фильтруем только музыку
+		var music []model.VideoResponse
+		for _, v := range allVideos {
+			if v.ContentType == "audio" {
+				music = append(music, v)
+			}
+		}
+
+		// Применяем пагинацию
+		start := (page - 1) * limit
+		end := start + limit
+		if end > len(music) {
+			end = len(music)
+		}
+		if start < len(music) {
+			music = music[start:end]
+		} else {
+			music = []model.VideoResponse{}
+		}
+
+		musicResults := make([]gin.H, len(music))
+		for i, track := range music {
+			musicResults[i] = gin.H{
+				"type": "music",
+				"data": track,
+			}
+		}
+
+		response = gin.H{
+			"results": musicResults,
+			"pagination": gin.H{
+				"page":  page,
+				"limit": limit,
+				"total": len(music),
+			},
+		}
+
+	case "photos":
+		// Только фото
+		var currentUserID *uuid.UUID
+		if uid, ok := c.Get("userID"); ok {
+			if v, ok2 := uid.(uuid.UUID); ok2 {
+				currentUserID = &v
+			}
+		}
+		photos, err := h.imageService.GetAllImagesPaginated(q, nil, currentUserID, page-1, limit)
+		if err != nil {
+			log.Printf("[SearchHandler] Error searching photos: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search photos"})
+			return
+		}
+
+		photoResults := make([]gin.H, len(photos))
+		for i, photo := range photos {
+			photoResults[i] = gin.H{
+				"type": "photo",
+				"data": photo,
+			}
+		}
+
+		response = gin.H{
+			"results": photoResults,
+			"pagination": gin.H{
+				"page":  page,
+				"limit": limit,
+				"total": len(photos),
+			},
+		}
+
 	default:
-		// Все результаты (и видео, и авторы)
+		// По умолчанию возвращаем только видео (для обратной совместимости)
 		var currentUserID *uuid.UUID
 		if uid, ok := c.Get("userID"); ok {
 			if v, ok2 := uid.(uuid.UUID); ok2 {
@@ -115,43 +225,29 @@ func (h *SearchHandler) SearchVideosAndAuthors(c *gin.Context) {
 			return
 		}
 
-		authorLimit := limit / 2
-		if authorLimit < 1 {
-			authorLimit = 1
-		}
-		authorOffset := offset / 2
-		authors, err := h.searchAuthors(q, authorLimit, authorOffset) // Делим лимит между типами
-		if err != nil {
-			log.Printf("[SearchHandler] Error searching authors: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search authors"})
-			return
+		// Фильтруем только видео (не музыку)
+		var videoResults []model.VideoResponse
+		for _, v := range videos {
+			contentType := v.ContentType
+			if contentType == "" || contentType == "video" {
+				videoResults = append(videoResults, v)
+			}
 		}
 
-		// Собираем все результаты в один массив
-		allResults := make([]gin.H, 0, len(videos)+len(authors))
-
-		// Добавляем видео
-		for _, video := range videos {
-			allResults = append(allResults, gin.H{
+		results := make([]gin.H, len(videoResults))
+		for i, video := range videoResults {
+			results[i] = gin.H{
 				"type": "video",
 				"data": video,
-			})
-		}
-
-		// Добавляем авторов
-		for _, author := range authors {
-			allResults = append(allResults, gin.H{
-				"type": "author",
-				"data": author,
-			})
+			}
 		}
 
 		response = gin.H{
-			"results": allResults,
+			"results": results,
 			"pagination": gin.H{
 				"page":  page,
 				"limit": limit,
-				"total": len(allResults),
+				"total": len(videoResults),
 			},
 		}
 	}

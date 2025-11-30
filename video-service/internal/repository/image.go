@@ -159,3 +159,94 @@ func (r *ImageRepository) UpdateMetadata(id uuid.UUID, req *model.UpdateImageMet
 	return err
 }
 
+func (r *ImageRepository) FindAllPaginatedWithSearch(query string, userID *uuid.UUID, currentUserID *uuid.UUID, page, pageSize int) ([]model.Image, error) {
+	base := `
+		SELECT id, title, image_path, width, height, file_size, author, description, tags, user_id, status, is_private, published_date, created_at, updated_at
+		FROM images
+	`
+	where := ""
+	args := []interface{}{}
+	argIndex := 1
+
+	// Фильтр по приватности: показываем публичные или свои
+	if currentUserID != nil {
+		where = "WHERE (is_private = FALSE OR user_id = $" + fmt.Sprintf("%d", argIndex) + ")"
+		args = append(args, *currentUserID)
+		argIndex++
+	} else {
+		where = "WHERE is_private = FALSE"
+	}
+
+	// Фильтр по пользователю (если указан)
+	if userID != nil {
+		if where != "" {
+			where += " AND user_id = $" + fmt.Sprintf("%d", argIndex)
+		} else {
+			where = "WHERE user_id = $" + fmt.Sprintf("%d", argIndex)
+		}
+		args = append(args, *userID)
+		argIndex++
+	}
+
+	// Поиск по запросу
+	if query != "" {
+		searchCondition := `
+			(LOWER(title::text) LIKE LOWER($` + fmt.Sprintf("%d", argIndex) + `) OR
+			LOWER(description::text) LIKE LOWER($` + fmt.Sprintf("%d", argIndex) + `) OR
+			LOWER(author::text) LIKE LOWER($` + fmt.Sprintf("%d", argIndex) + `))
+		`
+		if where != "" {
+			where += " AND " + searchCondition
+		} else {
+			where = "WHERE " + searchCondition
+		}
+		args = append(args, "%"+query+"%")
+		argIndex++
+	}
+
+	// Фильтр по статусу
+	if where != "" {
+		where += " AND status = 'ready'"
+	} else {
+		where = "WHERE status = 'ready'"
+	}
+
+	queryStr := base + where + " ORDER BY created_at DESC LIMIT $" + fmt.Sprintf("%d", argIndex) + " OFFSET $" + fmt.Sprintf("%d", argIndex+1)
+	args = append(args, pageSize, page*pageSize)
+
+	rows, err := r.db.Query(queryStr, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var images []model.Image
+	for rows.Next() {
+		var image model.Image
+		var tags pq.StringArray
+		if err := rows.Scan(
+			&image.ID,
+			&image.Title,
+			&image.ImagePath,
+			&image.Width,
+			&image.Height,
+			&image.FileSize,
+			&image.Author,
+			&image.Description,
+			&tags,
+			&image.UserID,
+			&image.Status,
+			&image.IsPrivate,
+			&image.PublishedDate,
+			&image.CreatedAt,
+			&image.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		image.Tags = []string(tags)
+		images = append(images, image)
+	}
+
+	return images, nil
+}
+
