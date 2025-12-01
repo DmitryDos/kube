@@ -1,0 +1,204 @@
+/* src/components/PlaylistsSidebar/PlaylistsSidebar.module.css */
+.sidebar {
+  width: 280px;
+  min-height: calc(100vh - 40px);
+  max-height: calc(100vh - 40px);
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sidebar-open {
+  transform: translateX(0);
+}
+
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.overlay-open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.sidebar-header {
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.search-container {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebar-header :global(.search-bar) {
+  width: 100%;
+}
+
+.close-button {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: var(--accent-color);
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.close-button:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
+}
+
+/* На десктопе крестик скрыт */
+@media (min-width: 1024px) {
+  .close-button {
+    display: none;
+  }
+}
+
+.sidebar-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+}
+
+.add-playlist-button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background: var(--accent-color);
+  border: none;
+  border-radius: 12px;
+  color: var(--text-color);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.add-playlist-button:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+
+.add-playlist-button svg {
+  margin-right: 8px;
+}
+
+.playlists-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.playlist-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 12px 16px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-color);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.playlist-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.playlist-item.selected {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--accent-color);
+}
+
+.lock-icon {
+  margin-right: 8px;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.playlist-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Desktop: sidebar всегда видим */
+@media (min-width: 1064px) {
+  .sidebar-overlay {
+    display: none;
+  }
+}
+
+/* Mobile: sidebar скрыт по умолчанию */
+@media (max-width: 1063px) {
+  .sidebar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 280px;
+    height: 100vh;
+    min-height: 100vh;
+    max-height: 100vh;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    z-index: 1000;
+  }
+
+  .sidebar-open {
+    transform: translateX(0);
+  }
+}
+
+/* На экранах <= 420px sidebar на 100% */
+@media (max-width: 420px) {
+  .sidebar {
+    width: 100%;
+    border-radius: 0;
+  }
+
+  .sidebar-header {
+    padding: 12px;
+  }
+
+  .sidebar-content {
+    padding: 12px;
+  }
+}
+

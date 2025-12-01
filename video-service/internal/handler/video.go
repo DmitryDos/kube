@@ -63,12 +63,9 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
 		return
 	}
 
-	ctx := c.Request.Context()
-	presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
-	if err != nil {
-		h.service.DeleteVideo(userIDUUID, video.ID)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate stream URL"})
-		return
+	var fileURL string
+	if video.FilePath != "" {
+		fileURL = fmt.Sprintf("/api/videos/%s/stream", video.ID.String())
 	}
 
 	var thumbnailURL string
@@ -89,10 +86,11 @@ func (h *VideoHandler) UploadVideo(c *gin.Context) {
 			Description:  video.Description,
 			UserID:       video.UserID,
 			FileSize:     video.FileSize,
-			FileURL:      presignedURL,
+			FileURL:      fileURL,
 			ThumbnailURL: thumbnailURL,
 			Status:       video.Status,
 			Duration:     duration,
+			IsPrivate:    video.IsPrivate,
 			CreatedAt:    video.CreatedAt,
 		},
 	})
@@ -123,12 +121,9 @@ func (h *VideoHandler) UploadVideoRaw(c *gin.Context) {
 
 	c.Writer.Header().Add("X-Uploaded-Video-ID", video.ID.String())
 
-	ctx := c.Request.Context()
-	presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
-	if err != nil {
-		h.service.DeleteVideo(userIDUUID, video.ID)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate stream URL"})
-		return
+	var fileURL string
+	if video.FilePath != "" {
+		fileURL = fmt.Sprintf("/api/videos/%s/stream", video.ID.String())
 	}
 
 	var thumbnailURL string
@@ -149,10 +144,11 @@ func (h *VideoHandler) UploadVideoRaw(c *gin.Context) {
 			Description:  video.Description,
 			UserID:       video.UserID,
 			FileSize:     video.FileSize,
-			FileURL:      presignedURL,
+			FileURL:      fileURL,
 			ThumbnailURL: thumbnailURL,
 			Status:       video.Status,
 			Duration:     duration,
+			IsPrivate:    video.IsPrivate,
 			CreatedAt:    video.CreatedAt,
 		},
 	})
@@ -197,15 +193,24 @@ func (h *VideoHandler) SearchAllVideos(c *gin.Context) {
 	page, _ := strconv.Atoi(pageStr)
 	limit, _ := strconv.Atoi(limitStr)
 	var filterUserID *uuid.UUID
-	if mine == "true" {
-		if uid, ok := c.Get("userID"); ok {
-			if v, ok2 := uid.(uuid.UUID); ok2 { filterUserID = &v }
+	var currentUserID *uuid.UUID
+	
+	if uid, ok := c.Get("userID"); ok {
+		if v, ok2 := uid.(uuid.UUID); ok2 {
+			currentUserID = &v
+			if mine == "true" {
+				filterUserID = &v
+			}
 		}
-	} else if userIDStr != "" {
-		if v, err := uuid.Parse(userIDStr); err == nil { filterUserID = &v }
+	}
+	
+	if mine != "true" && userIDStr != "" {
+		if v, err := uuid.Parse(userIDStr); err == nil {
+			filterUserID = &v
+		}
 	}
 
-	videos, err := h.service.GetAllVideosPaginated(q, filterUserID, page, limit)
+	videos, err := h.service.GetAllVideosPaginated(q, filterUserID, currentUserID, page, limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search videos"})
 		return
@@ -281,6 +286,7 @@ func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
 
 	rangeHeader := c.GetHeader("Range")
 	var start, end int64 = 0, -1
+	hasRange := false
 
 	if rangeHeader != "" {
 		re := regexp.MustCompile(`bytes=(\d+)-(\d*)`)
@@ -290,14 +296,38 @@ func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
 			if matches[2] != "" {
 				end, _ = strconv.ParseInt(matches[2], 10, 64)
 			}
+			hasRange = true
 		}
 	}
 
 	ctx := c.Request.Context()
 	totalSize, contentType, err := h.service.StatObject(ctx, video.FilePath)
 	if err != nil {
+		log.Printf("[StreamVideoProxy] Failed to stat object: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get video info"})
 		return
+	}
+
+	// Убеждаемся, что Content-Type правильный для видео
+	if contentType == "" || contentType == "application/octet-stream" {
+		// Определяем Content-Type по расширению файла
+		if len(video.FilePath) > 4 {
+			ext := video.FilePath[len(video.FilePath)-4:]
+			switch ext {
+			case ".mp4":
+				contentType = "video/mp4"
+			case ".mov":
+				contentType = "video/quicktime"
+			case ".mkv":
+				contentType = "video/x-matroska"
+			case ".m4v":
+				contentType = "video/x-m4v"
+			default:
+				contentType = "video/mp4" // По умолчанию mp4
+			}
+		} else {
+			contentType = "video/mp4"
+		}
 	}
 
 	if end < 0 || end >= totalSize {
@@ -306,35 +336,39 @@ func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
 
 	obj, err := h.service.GetObjectRange(ctx, video.FilePath, start, end)
 	if err != nil {
+		log.Printf("[StreamVideoProxy] Failed to get object range: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to stream video"})
 		return
 	}
 	defer obj.Close()
 
-	status := http.StatusOK
-	if rangeHeader != "" {
-		status = http.StatusPartialContent
-	}
-
+	// Всегда устанавливаем Accept-Ranges, чтобы AVPlayer знал, что сервер поддерживает Range requests
 	c.Header("Accept-Ranges", "bytes")
 	c.Header("Content-Type", contentType)
-	if status == http.StatusPartialContent {
+	c.Header("Cache-Control", "no-cache")
+
+	if hasRange {
+		// Range request - возвращаем 206 Partial Content
 		var contentLen int64
 		if end >= 0 {
 			contentLen = end - start + 1
-			c.Header("Content-Range", "bytes "+strconv.FormatInt(start,10)+"-"+strconv.FormatInt(end,10)+"/"+strconv.FormatInt(totalSize,10))
+			c.Header("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, totalSize))
 		} else {
 			contentLen = totalSize - start
-			c.Header("Content-Range", "bytes "+strconv.FormatInt(start,10)+"-"+strconv.FormatInt(totalSize-1,10)+"/"+strconv.FormatInt(totalSize,10))
+			c.Header("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, totalSize-1, totalSize))
 		}
 		c.Header("Content-Length", strconv.FormatInt(contentLen, 10))
 		c.Status(http.StatusPartialContent)
+		log.Printf("[StreamVideoProxy] Sending partial content: bytes %d-%d/%d (Content-Length: %d)", start, end, totalSize, contentLen)
 	} else {
+		// Первый запрос без Range - возвращаем весь файл, но с правильными заголовками
 		c.Header("Content-Length", strconv.FormatInt(totalSize, 10))
 		c.Status(http.StatusOK)
+		log.Printf("[StreamVideoProxy] Sending full content: size %d, Content-Type: %s", totalSize, contentType)
 	}
 
 	if _, err := io.Copy(c.Writer, obj); err != nil {
+		log.Printf("[StreamVideoProxy] Error copying data: %v", err)
 		return
 	}
 }

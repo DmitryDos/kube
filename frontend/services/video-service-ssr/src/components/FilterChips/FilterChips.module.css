@@ -1,0 +1,51 @@
+/* src/components/FilterChips/FilterChips.module.css */
+.filter-chips {
+  display: flex;
+  gap: 8px;
+  padding: 6px 0px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.filter-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 20px;
+  background: var(--secondary-color);
+  color: var(--text-color);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.chip:hover {
+  background: var(--secondary-color);
+  opacity: 0.9;
+}
+
+.chip-selected {
+  background: var(--accent-color);
+  color: white;
+}
+
+.chip-selected:hover {
+  background: var(--accent-color);
+  opacity: 0.9;
+}
+
+/* Media queries for narrow screens */
+@media (max-width: 480px) {
+  .chip {
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+}
+

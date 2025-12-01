@@ -16,11 +16,12 @@ final class Track: Sendable, Codable, Hashable {
     var ownerUserId: UUID?
     var fileSize: Int64?
     var status: String?
+    var isPrivate: Bool
 
     var isSaved: Bool
     var localFilePath: String?
 
-    init(id: UUID, title: String, desc: String, duration: TimeInterval, videoURL: String? = nil, thumbnailURL: String? = nil, ownerUserId: UUID? = nil, dateAdded: Date = Date()) {
+    init(id: UUID, title: String, desc: String, duration: TimeInterval, videoURL: String? = nil, thumbnailURL: String? = nil, ownerUserId: UUID? = nil, dateAdded: Date = Date(), isPrivate: Bool = false) {
         self.id = id
         self.title = title
         self.desc = desc
@@ -31,6 +32,7 @@ final class Track: Sendable, Codable, Hashable {
         self.ownerUserId = ownerUserId
         self.fileSize = nil
         self.status = nil
+        self.isPrivate = isPrivate
         self.isSaved = false
         self.localFilePath = nil
     }
@@ -46,6 +48,7 @@ final class Track: Sendable, Codable, Hashable {
         case status
         case createdAt = "created_at"
         case duration
+        case isPrivate = "is_private"
     }
     
     required init(from decoder: Decoder) throws {
@@ -62,6 +65,7 @@ final class Track: Sendable, Codable, Hashable {
         self.ownerUserId = try? container.decode(UUID.self, forKey: .userId)
         self.fileSize = try? container.decode(Int64.self, forKey: .fileSize)
         self.status = try? container.decode(String.self, forKey: .status)
+        self.isPrivate = (try? container.decode(Bool.self, forKey: .isPrivate)) ?? false
 
         self.isSaved = false
         self.localFilePath = nil

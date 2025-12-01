@@ -27,13 +27,15 @@ struct User: Codable, Identifiable {
         name = try container.decode(String.self, forKey: .name)
         createdAt = try? container.decode(Date.self, forKey: .createdAt)
         
-        // Декодируем id как UUID из строки
-        let idString = try container.decode(String.self, forKey: .id)
-        guard let uuid = UUID(uuidString: idString) else {
-            throw DecodingError.dataCorruptedError(forKey: .id, in: container, 
-                debugDescription: "Invalid UUID string: \(idString)")
+        // Декодируем id - может быть строкой (UUID) или числом (старый формат)
+        if let idString = try? container.decode(String.self, forKey: .id),
+           let uuid = UUID(uuidString: idString) {
+            id = uuid
+        } else {
+            // Если приходит число или другой формат, генерируем случайный UUID
+            // В будущем сервер должен возвращать UUID строкой
+            id = UUID()
         }
-        id = uuid
     }
     
     func encode(to encoder: Encoder) throws {

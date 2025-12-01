@@ -1,0 +1,132 @@
+/* src/components/AuthForm/AuthForm.module.css */
+.auth-form {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-color);
+  opacity: 0.8;
+  pointer-events: none;
+  user-select: none;
+}
+
+.input {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--secondary-color);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: var(--text-color);
+  font-size: 16px;
+  font-family: inherit;
+  outline: none;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
+  cursor: text;
+}
+
+.input:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(255, 165, 0, 0.2);
+}
+
+.input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.input::placeholder {
+  color: var(--text-color);
+  opacity: 0.5;
+}
+
+.submit-button {
+  width: 100%;
+  padding: 14px;
+  background: var(--accent-color);
+  border: none;
+  border-radius: 12px;
+  color: var(--text-color);
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 8px;
+}
+
+.submit-button:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: scale(1.02);
+}
+
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.error {
+  padding: 12px 16px;
+  background: rgba(255, 0, 0, 0.1);
+  border: 1px solid rgba(255, 0, 0, 0.3);
+  border-radius: 12px;
+  color: #ff6b6b;
+  font-size: 14px;
+  text-align: center;
+}
+
+.toggle-mode {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--text-color);
+  opacity: 0.7;
+}
+
+.toggle-button {
+  background: transparent;
+  border: none;
+  color: var(--accent-color);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  transition: opacity 0.2s ease;
+}
+
+.toggle-button:hover:not(:disabled) {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.toggle-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* На экранах <= 420px */
+@media (max-width: 420px) {
+  .auth-form {
+    max-width: 100%;
+    padding: 20px;
+  }
+}
+

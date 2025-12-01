@@ -1,0 +1,257 @@
+/* src/components/SearchPage/SearchPage.module.css */
+.search-page {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100vh;
+  margin: 0 auto;
+  padding: 20px;
+  overflow: hidden;
+}
+
+/* Когда SearchPage рендерится отдельно (не в PlayerPage), разрешаем скролл */
+:not([data-embedded]) .search-page {
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.search-header {
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.search-controls {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  align-items: flex-start;
+}
+
+.search-content {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-start;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.search-results {
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  overflow-y: hidden;
+  overflow-x: hidden;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* Разрешаем скролл когда на родителе есть класс scroll-enabled */
+:global(.scroll-enabled) :global(.search-page) .search-results,
+:global(.scroll-enabled) .search-results {
+  overflow-y: auto !important;
+}
+
+/* Когда SearchPage рендерится отдельно (не в PlayerPage), разрешаем скролл */
+:not([data-embedded]) .search-page .search-results {
+  overflow-y: auto !important;
+}
+
+.search-results::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+.search-content > *:not(.loading):not(.error):not(.empty):not(.loading-more):not(.search-results) {
+  width: 100%;
+  max-width: 100%;
+}
+
+.loading,
+.error,
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  gap: 16px;
+  color: var(--text-color);
+  opacity: 0.7;
+  width: 100%;
+}
+
+.loading svg,
+.empty svg {
+  color: var(--accent-color);
+  opacity: 0.5;
+}
+
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--secondary-color);
+  border-top-color: var(--accent-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.error {
+  color: var(--text-color);
+}
+
+.retry-button {
+  padding: 8px 16px;
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.retry-button:hover {
+  opacity: 0.9;
+  transform: scale(1.05);
+}
+
+.empty p {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.empty-hint {
+  font-size: 14px;
+  font-weight: 400;
+  opacity: 0.6;
+}
+
+.load-more-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  width: 100%;
+  gap: 12px;
+}
+
+.load-more-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: var(--accent-color);
+  color: var(--text-color);
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 140px;
+}
+
+.load-more-button:hover:not(:disabled) {
+  opacity: 0.9;
+  transform: scale(1.05);
+}
+
+.load-more-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.load-more-button .spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: var(--text-color);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.load-more-error {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-color);
+  opacity: 0.7;
+  text-align: center;
+}
+
+.loading-more {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  width: 100%;
+}
+
+.loading-more .spinner {
+  width: 24px;
+  height: 24px;
+  border-width: 2px;
+}
+
+@media (max-width: 768px) {
+  .loading,
+  .error,
+  .empty {
+    padding: 40px 16px;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .loading,
+  .error,
+  .empty {
+    padding: 30px 12px;
+    gap: 12px;
+  }
+
+  .empty svg {
+    width: 48px;
+    height: 48px;
+  }
+
+  .empty p {
+    font-size: 14px;
+  }
+
+  .empty-hint {
+    font-size: 12px;
+  }
+}
+
+/* На экранах <= 420px убираем паддинги и делаем на 100% */
+@media (max-width: 420px) {
+  .search-page {
+    width: 100%;
+    padding: 0;
+  }
+
+  .search-header {
+    padding: 12px;
+  }
+
+  .search-results {
+    border-radius: 0;
+  }
+}
+

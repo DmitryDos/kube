@@ -17,13 +17,9 @@ class QueueService: ObservableObject {
     @Published var isLooping: Bool = false
     
     private let trackController = TrackController.shared
-    private let historyService = HistoryService.shared
     
     private init() {}
     
-    // MARK: - Основные методы
-
-    // MARK: - Валидация ссылок на модели
     private func purgeInvalid() {
         let validIds = Set(trackController.tracks.map { $0.id })
         if !validIds.isEmpty {
@@ -51,8 +47,6 @@ class QueueService: ObservableObject {
             AudioPlayerService.shared.play()
             return
         }
-
-        historyService.recordPlayed(track)
 
         if currentIndex > 0 {
             let start = max(0, currentIndex - 5)
@@ -137,6 +131,14 @@ class QueueService: ObservableObject {
         let track = currentQueue[index]
         AudioPlayerService.shared.load(track: track)
         AudioPlayerService.shared.play()
+    }
+    
+    func togglePlayPause() {
+        if AudioPlayerService.shared.trackInfo.isPlaying {
+            AudioPlayerService.shared.pause()
+        } else {
+            AudioPlayerService.shared.play()
+        }
     }
 
     func removeTrackFromQueues(_ track: Track) {

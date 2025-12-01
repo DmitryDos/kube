@@ -14,9 +14,12 @@ type Video struct {
 	FilePath     string         `json:"file_path" db:"file_path"`
 	FileSize     int64          `json:"file_size" db:"file_size"`
 	Duration     sql.NullFloat64 `json:"duration" db:"duration"`
-	ThumbnailPath sql.NullString `json:"thumbnail_path" db:"thumbnail_path"`
+	ThumbnailPath sql.NullString `json:"thumbnail_path" db:"thumbnail_path"` // Deprecated: используйте ImageID
+	ImageID      sql.NullString `json:"image_id" db:"image_id"` // Ссылка на таблицу images для обложки
+	ContentType  string         `json:"content_type" db:"content_type"` // "video", "audio" or "image"
 	UserID       uuid.UUID      `json:"user_id" db:"user_id"`
 	Status       string         `json:"status" db:"status"`
+	IsPrivate    bool           `json:"is_private" db:"is_private"`
 	CreatedAt    time.Time      `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time      `json:"updated_at" db:"updated_at"`
 }
@@ -29,6 +32,7 @@ type CreateVideoRequest struct {
 type UpdateVideoMetadataRequest struct {
 	Title       *string `json:"title"`
 	Description *string `json:"description"`
+	IsPrivate   *bool   `json:"is_private"`
 }
 
 type VideoResponse struct {
@@ -41,5 +45,7 @@ type VideoResponse struct {
 	ThumbnailURL string    `json:"thumbnail_url,omitempty"`
 	Status       string    `json:"status"`
 	Duration     float64   `json:"duration"`
+	ContentType  string    `json:"content_type,omitempty"`
+	IsPrivate    bool      `json:"is_private"`
 	CreatedAt    time.Time `json:"created_at"`
 }

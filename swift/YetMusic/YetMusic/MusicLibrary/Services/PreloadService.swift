@@ -35,7 +35,8 @@ final class PreloadService {
     }
     
     private func downloadAndStore(url: URL, for track: Track) async throws {
-        let (tmpURL, response) = try await session.download(from: url)
+        var request = URLRequest(url: url)
+        let (tmpURL, response) = try await session.download(for: request)
         guard let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else { return }
         
         // Get file size

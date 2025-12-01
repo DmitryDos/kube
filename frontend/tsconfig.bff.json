@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.checks.json",
+  "compilerOptions": {
+    "module": "esnext",
+    "target": "esnext",
+    "moduleResolution": "node",
+
+    "jsx": "react-jsx",
+    "lib": ["ESNext"],
+    "rootDirs": ["src"],
+
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+
+    "plugins": [
+      {
+        "name": "typescript-plugin-css-modules"
+      }
+    ]
+  },
+  "exclude": ["**/node_modules"],
+  "ts-node": {
+    "experimentalResolver": true,
+    "swc": true
+  }
+}

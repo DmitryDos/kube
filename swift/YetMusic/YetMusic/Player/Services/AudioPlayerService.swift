@@ -25,7 +25,6 @@ class AudioPlayerService: NSObject, ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     private let queueService = QueueService.shared
-    private let historyService = HistoryService.shared
     @Published var isAutoPlayEnabled: Bool = true
     
     override init() {
@@ -68,10 +67,6 @@ class AudioPlayerService: NSObject, ObservableObject {
         NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)
             .sink { [weak self] _ in
                 guard let self = self else { return }
-                // Record finished track into history before advancing
-                if let finished = self.trackInfo.track {
-                    self.historyService.recordPlayed(finished)
-                }
                 if self.isAutoPlayEnabled {
                     self.playNext()
                 } else {
@@ -86,21 +81,37 @@ class AudioPlayerService: NSObject, ObservableObject {
     }
     
     func load(track: Track) {
+        print("[AudioPlayerService] 🎵 Loading track: \(track.title) (ID: \(track.id.uuidString))")
+        print("[AudioPlayerService] Track status: \(track.status ?? "nil")")
+        print("[AudioPlayerService] Track fileSize: \(track.fileSize ?? 0) bytes")
+        
+        // Проверяем статус видео перед загрузкой
+        if let status = track.status, status != "ready" {
+            print("[AudioPlayerService] ⚠️ Video status is '\(status)', not 'ready'. May not play correctly.")
+        }
+        
         if track.isSaved, let local = track.playableURL {
+            print("[AudioPlayerService] 📁 Loading from local file: \(local.path)")
             let item = AVPlayerItem(url: local)
             player.replaceCurrentItem(with: item)
             observeItem(item)
         } else {
             // Используем track.id для стрима, а не track.videoURL (который содержит presigned URL)
-            let base = VideoService.shared.baseURL
-            guard let url = URL(string: base + "/api/videos/\(track.id.uuidString)/stream/proxy") else { return }
-
-            var headers: [String: String] = [:]
-            if let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) {
-                headers["Authorization"] = "Bearer \(token)"
-            }
+            // Для просмотра видео авторизация не требуется
+            let base = AppConfig.apiBaseURL
+            let streamURLString = base + "/api/videos/\(track.id.uuidString)/stream/proxy"
+            print("[AudioPlayerService] 🌐 Loading from stream URL: \(streamURLString)")
             
-            let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+            guard let url = URL(string: streamURLString) else {
+                print("[AudioPlayerService] ❌ Failed to create URL from: \(streamURLString)")
+                return
+            }
+
+            // Настройка AVURLAsset для стриминга
+            // Не добавляем Range заголовок здесь, AVPlayer сам управляет range requests
+            let asset = AVURLAsset(url: url, options: nil)
+            
+            print("[AudioPlayerService] 📦 Created AVURLAsset, loading...")
             let item = AVPlayerItem(asset: asset)
             player.replaceCurrentItem(with: item)
             observeItem(item)
@@ -119,13 +130,61 @@ class AudioPlayerService: NSObject, ObservableObject {
         itemObservers.forEach { $0.invalidate() }
         itemObservers.removeAll()
 
+        // Status observer - критически важно для диагностики
+        let statusObs = item.observe(\.status, options: [.new, .initial]) { [weak self] item, change in
+            DispatchQueue.main.async {
+                switch item.status {
+                case .readyToPlay:
+                    print("[AudioPlayerService] ✅ Item ready to play")
+                    if let url = (item.asset as? AVURLAsset)?.url {
+                        print("[AudioPlayerService] URL: \(url.absoluteString)")
+                    }
+                    if let duration = item.asset.duration.seconds as? Double, duration.isFinite {
+                        print("[AudioPlayerService] Duration: \(duration) seconds")
+                    }
+                case .failed:
+                    print("[AudioPlayerService] ❌ Item failed to load")
+                    if let error = item.error {
+                        print("[AudioPlayerService] Error: \(error.localizedDescription)")
+                        print("[AudioPlayerService] Error domain: \((error as NSError).domain)")
+                        print("[AudioPlayerService] Error code: \((error as NSError).code)")
+                        if let userInfo = (error as NSError).userInfo as? [String: Any] {
+                            print("[AudioPlayerService] Error userInfo: \(userInfo)")
+                        }
+                    }
+                    if let errorLog = item.errorLog() {
+                        print("[AudioPlayerService] Error log entries: \(errorLog.events.count)")
+                        for event in errorLog.events {
+                            print("[AudioPlayerService] Error log: \(event.errorComment ?? "unknown")")
+                        }
+                    }
+                case .unknown:
+                    print("[AudioPlayerService] ⏳ Item status unknown (loading...)")
+                @unknown default:
+                    print("[AudioPlayerService] ⚠️ Unknown status")
+                }
+            }
+        }
+
         // Buffering state
         let obs1 = item.observe(\.isPlaybackBufferEmpty, options: [.new]) { [weak self] item, change in
-            DispatchQueue.main.async { self?.trackInfo.isBuffering = item.isPlaybackBufferEmpty }
+            DispatchQueue.main.async { 
+                self?.trackInfo.isBuffering = item.isPlaybackBufferEmpty
+                if item.isPlaybackBufferEmpty {
+                    print("[AudioPlayerService] ⏳ Buffer is empty")
+                }
+            }
         }
         // Likely to keep up
         let obs2 = item.observe(\.isPlaybackLikelyToKeepUp, options: [.new]) { [weak self] item, change in
-            DispatchQueue.main.async { self?.trackInfo.isBuffering = !item.isPlaybackLikelyToKeepUp }
+            DispatchQueue.main.async { 
+                self?.trackInfo.isBuffering = !item.isPlaybackLikelyToKeepUp
+                if item.isPlaybackLikelyToKeepUp {
+                    print("[AudioPlayerService] ✅ Playback likely to keep up")
+                } else {
+                    print("[AudioPlayerService] ⏳ Playback may stall")
+                }
+            }
         }
         // Loaded time ranges → buffered progress
         let obs3 = item.observe(\.loadedTimeRanges, options: [.new]) { [weak self] item, change in
@@ -136,10 +195,30 @@ class AudioPlayerService: NSObject, ObservableObject {
             let duration = item.duration.seconds
             let safeDuration = duration.isFinite && !duration.isNaN && duration > 0 ? duration : 0
             let buffered = safeDuration > 0 ? min(1.0, bufferedEnd / safeDuration) : 0
-            DispatchQueue.main.async { self.trackInfo.bufferedProgress = buffered }
+            DispatchQueue.main.async { 
+                self.trackInfo.bufferedProgress = buffered
+                if buffered > 0 {
+                    print("[AudioPlayerService] 📊 Buffered: \(Int(buffered * 100))% (\(bufferedEnd)s / \(safeDuration)s)")
+                }
+            }
         }
 
-        itemObservers = [obs1, obs2, obs3]
+        itemObservers = [statusObs, obs1, obs2, obs3]
+        
+        // Обработка ошибок через NotificationCenter
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(playerItemFailedToPlay),
+            name: .AVPlayerItemFailedToPlayToEndTime,
+            object: item
+        )
+    }
+    
+    @objc private func playerItemFailedToPlay(_ notification: Notification) {
+        print("[AudioPlayerService] ❌ Player item failed to play to end time")
+        if let error = notification.userInfo?[AVPlayerItemFailedToPlayToEndTimeErrorKey] as? Error {
+            print("[AudioPlayerService] Error: \(error.localizedDescription)")
+        }
     }
     
     func play() {
@@ -152,8 +231,31 @@ class AudioPlayerService: NSObject, ObservableObject {
             }
         }
         
+        print("[AudioPlayerService] ▶️ Starting playback")
+        print("[AudioPlayerService] Player status: \(player.status.rawValue)")
+        if let item = player.currentItem {
+            print("[AudioPlayerService] Item status: \(item.status.rawValue)")
+            print("[AudioPlayerService] Item canPlay: \(item.status == .readyToPlay)")
+        }
+        
         player.play()
         trackInfo.isPlaying = true
+        
+        // Проверяем через небольшую задержку, началось ли воспроизведение
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
+            guard let self = self else { return }
+            if self.player.rate == 0 && self.trackInfo.isPlaying {
+                print("[AudioPlayerService] ⚠️ Playback started but player rate is 0")
+                if let error = self.player.error {
+                    print("[AudioPlayerService] Player error: \(error.localizedDescription)")
+                }
+                if let item = self.player.currentItem, let error = item.error {
+                    print("[AudioPlayerService] Item error: \(error.localizedDescription)")
+                }
+            } else if self.player.rate > 0 {
+                print("[AudioPlayerService] ✅ Playback is active (rate: \(self.player.rate))")
+            }
+        }
     }
     
     func pause() {

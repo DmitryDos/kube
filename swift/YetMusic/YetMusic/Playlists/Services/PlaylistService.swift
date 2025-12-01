@@ -10,6 +10,17 @@ class PlaylistService: ObservableObject {
     @Published var playlists: [Playlist] = []
     private let modelContainer: ModelContainer
     private let modelContext: ModelContext
+    private let searchService = SearchService.shared
+
+    private var playlistPagination: [UUID: PlaylistPaginationState] = [:]
+    
+    struct PlaylistPaginationState {
+        var loadedTracks: [Track] = []
+        var currentPage: Int = 0
+        var pageSize: Int = 20
+        var isLoading: Bool = false
+        var hasMore: Bool = true
+    }
     
     private init() {
         modelContainer = PersistenceController.shared.container
@@ -58,8 +69,6 @@ class PlaylistService: ObservableObject {
         playlists = [likedPlaylist, yourTracks]
     }
     
-    // MARK: - Public Methods
-    
     func getPlaylistOrder() -> [Playlist] {
         return playlists
     }
@@ -68,17 +77,268 @@ class PlaylistService: ObservableObject {
         return playlists.first { $0.id == id }
     }
     
+    func getTrackIdsForPlaylist(_ playlistID: UUID) -> [UUID] {
+        guard let playlist = getPlaylist(by: playlistID) else { return [] }
+        return playlist.tracks.map { $0.id }
+    }
+    
     func getTracksForPlaylist(_ playlistID: UUID) -> [Track] {
         guard let playlist = getPlaylist(by: playlistID) else { return [] }
         
         if playlistID == PlaylistService.yourTracksPlaylistID {
-            let currentUserId = AuthService.shared.currentUser?.id
-            return TrackController.shared.tracks.filter { $0.ownerUserId == currentUserId }
-        } else {
-            let live = TrackController.shared.tracks
-            let liveIds = Set(live.map { $0.id })
-            return playlist.tracks.filter { liveIds.contains($0.id) }
+            return getYourTracks()
         }
+        
+        if let pagination = playlistPagination[playlistID] {
+            return pagination.loadedTracks
+        }
+        
+        loadPlaylistTracks(playlistID: playlistID, page: 0)
+        return []
+    }
+    
+    func searchTracks(query: String?, completion: @escaping ([Track]) -> Void) {
+        var currentPage = 1
+        var allTracks: [Track] = []
+        
+        func loadPage() {
+            searchService.searchWithPagination(
+                query: query,
+                filter: .videos,
+                page: currentPage,
+                pageSize: 20,
+                userId: nil,
+                mine: false,
+                trackIds: nil
+            ) { page, tracks, hasMore in
+                allTracks.append(contentsOf: tracks)
+                if hasMore {
+                    currentPage += 1
+                    loadPage()
+                } else {
+                    completion(allTracks)
+                }
+            }
+        }
+        
+        loadPage()
+    }
+    
+    func getTracksForEditing(selectedTrackIds: Set<UUID>) -> [Track] {
+        var allTracks: [Track] = []
+        var currentPage = 1
+        
+        func loadPage() {
+            searchService.searchWithPagination(
+                query: nil,
+                filter: .videos,
+                page: currentPage,
+                pageSize: 20,
+                userId: nil,
+                mine: false,
+                trackIds: nil
+            ) { page, tracks, hasMore in
+                let filtered = tracks.filter { selectedTrackIds.contains($0.id) }
+                allTracks.append(contentsOf: filtered)
+                if hasMore {
+                    currentPage += 1
+                    loadPage()
+                } else {
+                    return
+                }
+            }
+        }
+        
+        loadPage()
+        return allTracks
+    }
+    
+    func getAvailableTracksForPlaylist(playlistID: UUID, selectedTrackIds: Set<UUID>, currentTracks: [Track]) -> [Track] {
+        var allTracks: [Track] = []
+        var currentPage = 1
+        
+        func loadPage() {
+            searchService.searchWithPagination(
+                query: nil,
+                filter: .videos,
+                page: currentPage,
+                pageSize: 20,
+                userId: nil,
+                mine: false,
+                trackIds: nil
+            ) { page, tracks, hasMore in
+                allTracks.append(contentsOf: tracks)
+                if hasMore {
+                    currentPage += 1
+                    loadPage()
+                } else {
+                    return
+                }
+            }
+        }
+        
+        loadPage()
+        let currentTrackIds = Set(currentTracks.map { $0.id })
+        return allTracks.filter { selectedTrackIds.contains($0.id) && !currentTrackIds.contains($0) }
+    }
+    
+    func loadPlaylistTracks(playlistID: UUID, page: Int = 0, completion: (() -> Void)? = nil) {
+        if playlistID == PlaylistService.yourTracksPlaylistID {
+            loadYourTracks(page: page, completion: completion)
+            return
+        }
+        
+        guard let playlist = getPlaylist(by: playlistID) else {
+            completion?()
+            return
+        }
+        
+        if playlistPagination[playlistID] == nil {
+            playlistPagination[playlistID] = PlaylistPaginationState()
+        }
+        
+        guard var pagination = playlistPagination[playlistID],
+              !pagination.isLoading else {
+            completion?()
+            return
+        }
+        
+        pagination.isLoading = true
+        pagination.currentPage = page
+        playlistPagination[playlistID] = pagination
+        
+        let allTrackIds = playlist.tracks.map { $0.id }
+        let startIndex = page * pagination.pageSize
+        let endIndex = min(startIndex + pagination.pageSize, allTrackIds.count)
+        
+        guard startIndex < allTrackIds.count else {
+            DispatchQueue.main.async {
+                guard var updatedPagination = self.playlistPagination[playlistID] else {
+                    completion?()
+                    return
+                }
+                updatedPagination.isLoading = false
+                updatedPagination.hasMore = false
+                self.playlistPagination[playlistID] = updatedPagination
+                completion?()
+            }
+            return
+        }
+        
+        let pageTrackIds = Array(allTrackIds[startIndex..<endIndex])
+        
+        searchService.searchWithPagination(
+            query: nil,
+            filter: .videos,
+            page: 1,
+            pageSize: 1000,
+            userId: nil,
+            mine: false,
+            trackIds: pageTrackIds
+        ) { [weak self] loadedPage, loadedTracks, _ in
+            guard let self = self else {
+                completion?()
+                return
+            }
+            
+            DispatchQueue.main.async {
+                guard var updatedPagination = self.playlistPagination[playlistID] else {
+                    completion?()
+                    return
+                }
+                
+                if page == 0 {
+                    updatedPagination.loadedTracks = loadedTracks
+                } else {
+                    let existingIds = Set(updatedPagination.loadedTracks.map { $0.id })
+                    let newTracks = loadedTracks.filter { !existingIds.contains($0.id) }
+                    updatedPagination.loadedTracks.append(contentsOf: newTracks)
+                }
+                
+                updatedPagination.isLoading = false
+                updatedPagination.hasMore = endIndex < allTrackIds.count
+                self.playlistPagination[playlistID] = updatedPagination
+                
+                completion?()
+            }
+        }
+    }
+    
+    func loadMoreTracksForPlaylist(playlistID: UUID, completion: (() -> Void)? = nil) {
+        guard let pagination = playlistPagination[playlistID],
+              pagination.hasMore,
+              !pagination.isLoading else {
+            completion?()
+            return
+        }
+        
+        loadPlaylistTracks(playlistID: playlistID, page: pagination.currentPage + 1, completion: completion)
+    }
+    
+    private func getYourTracks() -> [Track] {
+        if let pagination = playlistPagination[PlaylistService.yourTracksPlaylistID] {
+            return pagination.loadedTracks
+        }
+        
+        loadYourTracks(page: 0)
+        return []
+    }
+    
+    func loadYourTracks(page: Int = 0, completion: (() -> Void)? = nil) {
+        if playlistPagination[PlaylistService.yourTracksPlaylistID] == nil {
+            playlistPagination[PlaylistService.yourTracksPlaylistID] = PlaylistPaginationState()
+        }
+        
+        guard var pagination = playlistPagination[PlaylistService.yourTracksPlaylistID],
+              !pagination.isLoading else {
+            completion?()
+            return
+        }
+        
+        pagination.isLoading = true
+        pagination.currentPage = page
+        playlistPagination[PlaylistService.yourTracksPlaylistID] = pagination
+        
+        searchService.searchWithPagination(
+            query: nil,
+            filter: .videos,
+            page: page + 1,
+            pageSize: pagination.pageSize,
+            userId: nil,
+            mine: true,
+            trackIds: nil
+        ) { [weak self] loadedPage, tracks, hasMore in
+            guard let self = self else {
+                completion?()
+                return
+            }
+            
+            DispatchQueue.main.async {
+                guard var updatedPagination = self.playlistPagination[PlaylistService.yourTracksPlaylistID] else {
+                    completion?()
+                    return
+                }
+                
+                if page == 0 {
+                    updatedPagination.loadedTracks = tracks
+                } else {
+                    let existingIds = Set(updatedPagination.loadedTracks.map { $0.id })
+                    let newTracks = tracks.filter { !existingIds.contains($0.id) }
+                    updatedPagination.loadedTracks.append(contentsOf: newTracks)
+                }
+                
+                updatedPagination.isLoading = false
+                updatedPagination.hasMore = hasMore
+                self.playlistPagination[PlaylistService.yourTracksPlaylistID] = updatedPagination
+                
+                completion?()
+            }
+        }
+    }
+    
+    func refreshPlaylistTracks(playlistID: UUID, completion: (() -> Void)? = nil) {
+        playlistPagination[playlistID] = PlaylistPaginationState()
+        loadPlaylistTracks(playlistID: playlistID, page: 0, completion: completion)
     }
     
     func createPlaylist(name: String) {
@@ -121,7 +381,6 @@ class PlaylistService: ObservableObject {
         _ = saveContext()
     }
 
-    // MARK: - Cleanup helpers
     func removeTrackFromAllPlaylists(trackId: UUID) {
         var changed = false
         for i in playlists.indices {
@@ -132,16 +391,7 @@ class PlaylistService: ObservableObject {
         if changed { _ = saveContext() }
     }
 
-    private func purgeInvalidTrackReferences() {
-        let liveIds = Set(TrackController.shared.tracks.map { $0.id })
-        var changed = false
-        for i in playlists.indices {
-            let before = playlists[i].tracks.count
-            playlists[i].tracks.removeAll { !liveIds.contains($0.id) }
-            if playlists[i].tracks.count != before { changed = true }
-        }
-        if changed { _ = saveContext() }
-    }
+    private func purgeInvalidTrackReferences() {}
     
     func toggleLike(track: Track) {
         if isTrackLiked(track) {
@@ -155,7 +405,7 @@ class PlaylistService: ObservableObject {
         guard let likedPlaylist = getPlaylist(by: PlaylistService.likedPlaylistID) else { return false }
         return likedPlaylist.tracks.contains(where: { $0.id == track.id })
     }
-    
+
     @discardableResult
     private func saveContext() -> Bool {
         do {

@@ -208,14 +208,27 @@ class AuthService: ObservableObject {
                 return
             }
             
-            guard (200...299).contains(httpResponse.statusCode) else {
-                let statusError = NetworkError.serverError(statusCode: httpResponse.statusCode)
-                completion(.failure(statusError))
+            guard let data = data else {
+                if !(200...299).contains(httpResponse.statusCode) {
+                    let statusError = NetworkError.serverError(statusCode: httpResponse.statusCode)
+                    completion(.failure(statusError))
+                } else {
+                    completion(.failure(NetworkError.noData))
+                }
                 return
             }
             
-            guard let data = data else {
-                completion(.failure(NetworkError.noData))
+            guard (200...299).contains(httpResponse.statusCode) else {
+                // Пытаемся извлечь сообщение об ошибке из ответа
+                if let errorResponse = try? JSONDecoder().decode([String: String].self, from: data),
+                   let errorMessage = errorResponse["error"] {
+                    let error = NSError(domain: "AuthService", code: httpResponse.statusCode, 
+                                      userInfo: [NSLocalizedDescriptionKey: errorMessage])
+                    completion(.failure(error))
+                } else {
+                    let statusError = NetworkError.serverError(statusCode: httpResponse.statusCode)
+                    completion(.failure(statusError))
+                }
                 return
             }
             

@@ -1,0 +1,34 @@
+/* src/components/AsyncTrackImage/AsyncTrackImage.module.css */
+.container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: var(--secondary-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.no-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--secondary-color);
+  color: var(--text-color);
+  opacity: 0.4;
+}

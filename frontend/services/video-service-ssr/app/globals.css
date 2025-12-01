@@ -1,0 +1,103 @@
+:root {
+  /* Light theme colors from ThemeSettings */
+  --light-accent-color: rgb(128, 0, 128); /* purple */
+  --light-primary-color: rgb(205, 102, 0);
+  --light-secondary-color: rgb(255, 245, 245);
+  --light-text-color: rgb(26, 26, 26);
+  --light-background-color: rgb(255, 255, 255);
+
+  /* Dark theme colors from ThemeSettings */
+  --dark-accent-color: rgb(255, 165, 0); /* orange */
+  --dark-primary-color: rgb(0, 122, 255); /* blue */
+  --dark-secondary-color: rgb(38, 13, 38);
+  --dark-text-color: rgb(255, 255, 255);
+  --dark-background-color: rgb(0, 0, 0);
+
+  /* Default to dark theme */
+  --accent-color: var(--dark-accent-color);
+  --primary-color: var(--dark-primary-color);
+  --secondary-color: var(--dark-secondary-color);
+  --text-color: var(--dark-text-color);
+  --background-color: var(--dark-background-color);
+}
+
+[data-theme="light"] {
+  --accent-color: var(--light-accent-color);
+  --primary-color: var(--light-primary-color);
+  --secondary-color: var(--light-secondary-color);
+  --text-color: var(--light-text-color);
+  --background-color: var(--light-background-color);
+}
+
+[data-theme="dark"] {
+  --accent-color: var(--dark-accent-color);
+  --primary-color: var(--dark-primary-color);
+  --secondary-color: var(--dark-secondary-color);
+  --text-color: var(--dark-text-color);
+  --background-color: var(--dark-background-color);
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  max-width: 100vw;
+  max-height: 100vh;
+  overflow: hidden;
+  background: var(--background-color);
+  color: var(--text-color);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  background: none;
+  font-family: inherit;
+}
+
+input {
+  font-family: inherit;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #444;
+}
+

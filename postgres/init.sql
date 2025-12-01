@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS videos (
     thumbnail_path VARCHAR(500),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     status VARCHAR(50) DEFAULT 'uploading',
+    is_private BOOLEAN DEFAULT FALSE NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -41,6 +42,7 @@ CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_videos_user_id ON videos(user_id);
 CREATE INDEX IF NOT EXISTS idx_videos_status ON videos(status);
 CREATE INDEX IF NOT EXISTS idx_videos_created_at ON videos(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_videos_is_private ON videos(is_private) WHERE is_private = FALSE;
 
 -- Функция для обновления updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()

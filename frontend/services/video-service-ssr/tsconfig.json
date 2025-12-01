@@ -1,0 +1,7 @@
+{
+  "extends": "../../tsconfig.ssr.json",
+  "compilerOptions": {
+    "baseUrl": "src"
+  },
+}
+

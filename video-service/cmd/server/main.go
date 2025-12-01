@@ -62,7 +62,8 @@ func main() {
     videoRepo := repository.NewVideoRepository(db)
     videoService := service.NewVideoService(videoRepo, minioClient)
     videoHandler := handler.NewVideoHandler(videoService)
-    searchHandler := handler.NewSearchHandler(videoService)
+    mediaHandler := handler.NewMediaHandler(videoService, nil)
+    searchHandler := handler.NewSearchHandler(videoService, nil)
     healthHandler := handler.NewHealthHandler()
 
     r := gin.Default()
@@ -82,6 +83,14 @@ func main() {
                 videosGroup.PUT("/:id", videoHandler.UpdateVideoMetadata)
                 videosGroup.PATCH("/:id", videoHandler.UpdateVideoMetadata)
                 videosGroup.DELETE("/:id", videoHandler.DeleteVideo)
+            }
+            
+            mediaGroup := protected.Group("")
+            {
+                mediaGroup.POST("/music/upload", mediaHandler.UploadAudio)
+                mediaGroup.POST("/photos/upload", mediaHandler.UploadPhoto)
+                mediaGroup.PUT("/photos/:id", mediaHandler.UpdatePhotoMetadata)
+                mediaGroup.PATCH("/photos/:id", mediaHandler.UpdatePhotoMetadata)
             }
         }
 

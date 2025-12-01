@@ -8,14 +8,7 @@
 		<true/>
 		<key>NSExceptionDomains</key>
 		<dict>
-			<key>127.0.0.1</key>
-			<dict>
-				<key>NSIncludesSubdomains</key>
-				<true/>
-				<key>NSTemporaryExceptionAllowsInsecureHTTPLoads</key>
-				<true/>
-			</dict>
-			<key>localhost</key>
+			<key>158.160.151.241</key>
 			<dict>
 				<key>NSIncludesSubdomains</key>
 				<true/>

@@ -1,0 +1,71 @@
+/* src/components/AddTrackModal/AddTrackModal.module.css */
+.add-track-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.input-group {
+  margin-bottom: 20px;
+}
+
+.label {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-color);
+  opacity: 0.8;
+}
+
+.input {
+  width: 100%;
+  padding: 12px;
+  background: var(--secondary-color);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: var(--text-color);
+  font-size: 16px;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.placeholder {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-color);
+  opacity: 0.6;
+}
+
+.placeholder-note {
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.5;
+}
+
+.save-button {
+  width: 100%;
+  padding: 12px;
+  background: var(--accent-color);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.save-button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.save-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+

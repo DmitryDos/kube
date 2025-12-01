@@ -1,0 +1,233 @@
+/* src/components/VideoCard/VideoCard.module.css */
+.video-card {
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  max-width: 600px;
+  width: 100%;
+  height: fit-content;
+  transition: all 0.3s ease;
+  position: relative;
+  padding: 5px;
+  background: var(--secondary-color);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.video-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 5px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.video-card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.thumbnail {
+  position: relative;
+  width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  aspect-ratio: 16/9;
+  background: var(--secondary-color);
+  z-index: 1;
+}
+
+.duration {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.8);
+  color: var(--text-color);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  z-index: 2;
+}
+
+.overlay-info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 1;
+}
+
+.author {
+  color: var(--text-color);
+  opacity: 0.9;
+  font-size: 12px;
+  margin: 0 0 4px 0;
+  font-weight: 500;
+}
+
+.title {
+  color: var(--text-color);
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+}
+
+/* Compact variant */
+.video-card.compact {
+  flex-direction: row;
+  max-width: 100%;
+  gap: 12px;
+}
+
+.video-card.compact .thumbnail {
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.video-card.compact .overlay-info {
+  padding: 8px;
+}
+
+.video-card.compact .title {
+  font-size: 12px;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
+
+.video-card.compact .author {
+  font-size: 11px;
+}
+
+/* Expanded variant */
+.video-card.expanded {
+  flex-direction: row;
+  max-width: 100%;
+  gap: 16px;
+  padding: 12px;
+}
+
+.video-card.expanded .thumbnail {
+  width: 320px;
+  height: 180px;
+  flex-shrink: 0;
+  aspect-ratio: 16/9;
+}
+
+.video-card.expanded .expanded-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 1;
+}
+
+.video-card.expanded .expanded-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.video-card.expanded .expanded-title {
+  color: var(--text-color);
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.video-card.expanded .expanded-author {
+  color: var(--text-color);
+  opacity: 0.8;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.video-card.expanded .expanded-description {
+  color: var(--text-color);
+  opacity: 0.7;
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.video-card.expanded .expanded-meta {
+  display: flex;
+  gap: 12px;
+  margin-top: auto;
+}
+
+.video-card.expanded .expanded-date,
+.video-card.expanded .expanded-duration {
+  color: var(--text-color);
+  opacity: 0.6;
+  font-size: 12px;
+}
+
+/* Media queries for narrow screens */
+@media (max-width: 768px) {
+  .video-card {
+    max-width: 100%;
+  }
+
+  .video-card.expanded {
+    flex-direction: column;
+    padding: 8px;
+  }
+
+  .video-card.expanded .thumbnail {
+    width: 100%;
+    height: auto;
+  }
+
+  .video-card.expanded .expanded-title {
+    font-size: 16px;
+  }
+
+  .video-card.expanded .expanded-author {
+    font-size: 13px;
+  }
+
+  .video-card.expanded .expanded-description {
+    font-size: 13px;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+  }
+}
+
+@media (max-width: 480px) {
+  .video-card {
+    padding: 4px;
+  }
+
+  .video-card.compact .thumbnail {
+    width: 100px;
+  }
+
+  .title {
+    font-size: 13px;
+  }
+
+  .author {
+    font-size: 11px;
+  }
+}
