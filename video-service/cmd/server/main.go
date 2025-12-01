@@ -62,6 +62,8 @@ func main() {
     videoRepo := repository.NewVideoRepository(db)
     videoService := service.NewVideoService(videoRepo, minioClient)
     videoHandler := handler.NewVideoHandler(videoService)
+    audioHandler := handler.NewAudioHandler(videoService)
+    photoHandler := handler.NewPhotoHandler(videoService)
     mediaHandler := handler.NewMediaHandler(videoService, nil)
     searchHandler := handler.NewSearchHandler(videoService, nil)
     healthHandler := handler.NewHealthHandler()
@@ -96,8 +98,8 @@ func main() {
 
         api.GET("/search", searchHandler.SearchVideosAndAuthors)
         api.GET("/videos/:id/stream", videoHandler.StreamVideo)
-        api.GET("/videos/:id/stream/url", videoHandler.GetStreamURL)
-        api.GET("/videos/:id/stream/proxy", videoHandler.StreamVideoProxy)
+        api.GET("/audio/:id/stream", audioHandler.StreamAudio)
+        api.GET("/photos/:id", photoHandler.GetPhoto)
         api.GET("/videos/:id/thumbnail", videoHandler.GetThumbnail)
     }
 

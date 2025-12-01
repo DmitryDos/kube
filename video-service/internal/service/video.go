@@ -66,10 +66,10 @@ func (s *VideoService) CreateMediaFile(userID uuid.UUID, fileHeader *model.FileH
     var filePath string
     
     if contentType == "image" {
-        // Для фото: сохраняем в thumbnails, file_path пустой
-        objectName = fmt.Sprintf("user-%s/thumbnails/%s", userID.String(), fileName)
-        thumbnailPath = sql.NullString{String: objectName, Valid: true}
-        filePath = "" // Пустой для фото
+        // Для фото: сохраняем в images, file_path содержит путь к фото
+        objectName = fmt.Sprintf("user-%s/images/%s", userID.String(), fileName)
+        filePath = objectName
+        thumbnailPath = sql.NullString{} // Для фото thumbnail не нужен
     } else if contentType == "audio" {
         objectName = fmt.Sprintf("user-%s/audio/%s", userID.String(), fileName)
         filePath = objectName

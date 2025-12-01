@@ -219,70 +219,26 @@ func (h *VideoHandler) SearchAllVideos(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"videos": videos})
 }
 
+
+
+// StreamVideo - стриминг только для видео
 func (h *VideoHandler) StreamVideo(c *gin.Context) {
-	videoID, err := uuid.Parse(c.Param("id"))
+	video, err := getVideoByID(h.service, c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
 		return
 	}
 
-	video, err := h.service.GetVideoPublic(videoID)
-	if err != nil {
+	if video == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
 		return
 	}
 
-	ctx := c.Request.Context()
-	presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate stream URL"})
+	// Проверяем, что это действительно видео
+	if video.ContentType != "" && video.ContentType != "video" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Not a video file"})
 		return
 	}
-
-	c.Redirect(http.StatusTemporaryRedirect, presignedURL)
-}
-
-func (h *VideoHandler) GetStreamURL(c *gin.Context) {
-	videoID, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
-		return
-	}
-
-	video, err := h.service.GetVideoPublic(videoID)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
-		return
-	}
-
-	ctx := c.Request.Context()
-	presignedURL, err := h.service.GetVideoStreamURL(ctx, video.FilePath)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate stream URL"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"url": presignedURL})
-}
-
-func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
-	idParam := c.Param("id")
-	log.Printf("[StreamVideoProxy] Received ID param: %s", idParam)
-	videoID, err := uuid.Parse(idParam)
-	if err != nil {
-		log.Printf("[StreamVideoProxy] Failed to parse UUID: %v, param: %s", err, idParam)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
-		return
-	}
-
-	log.Printf("[StreamVideoProxy] Parsed UUID: %s", videoID.String())
-	video, err := h.service.GetVideoPublic(videoID)
-	if err != nil {
-		log.Printf("[StreamVideoProxy] Video not found: %v, UUID: %s", err, videoID.String())
-		c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
-		return
-	}
-	log.Printf("[StreamVideoProxy] Found video: %s, file_path: %s", video.ID.String(), video.FilePath)
 
 	rangeHeader := c.GetHeader("Range")
 	var start, end int64 = 0, -1
@@ -303,14 +259,13 @@ func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
 	ctx := c.Request.Context()
 	totalSize, contentType, err := h.service.StatObject(ctx, video.FilePath)
 	if err != nil {
-		log.Printf("[StreamVideoProxy] Failed to stat object: %v", err)
+		log.Printf("[StreamVideo] Failed to stat object: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get video info"})
 		return
 	}
 
-	// Убеждаемся, что Content-Type правильный для видео
+	// Определяем Content-Type для видео
 	if contentType == "" || contentType == "application/octet-stream" {
-		// Определяем Content-Type по расширению файла
 		if len(video.FilePath) > 4 {
 			ext := video.FilePath[len(video.FilePath)-4:]
 			switch ext {
@@ -323,7 +278,7 @@ func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
 			case ".m4v":
 				contentType = "video/x-m4v"
 			default:
-				contentType = "video/mp4" // По умолчанию mp4
+				contentType = "video/mp4"
 			}
 		} else {
 			contentType = "video/mp4"
@@ -336,19 +291,17 @@ func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
 
 	obj, err := h.service.GetObjectRange(ctx, video.FilePath, start, end)
 	if err != nil {
-		log.Printf("[StreamVideoProxy] Failed to get object range: %v", err)
+		log.Printf("[StreamVideo] Failed to get object range: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to stream video"})
 		return
 	}
 	defer obj.Close()
 
-	// Всегда устанавливаем Accept-Ranges, чтобы AVPlayer знал, что сервер поддерживает Range requests
 	c.Header("Accept-Ranges", "bytes")
 	c.Header("Content-Type", contentType)
 	c.Header("Cache-Control", "no-cache")
 
 	if hasRange {
-		// Range request - возвращаем 206 Partial Content
 		var contentLen int64
 		if end >= 0 {
 			contentLen = end - start + 1
@@ -359,38 +312,29 @@ func (h *VideoHandler) StreamVideoProxy(c *gin.Context) {
 		}
 		c.Header("Content-Length", strconv.FormatInt(contentLen, 10))
 		c.Status(http.StatusPartialContent)
-		log.Printf("[StreamVideoProxy] Sending partial content: bytes %d-%d/%d (Content-Length: %d)", start, end, totalSize, contentLen)
 	} else {
-		// Первый запрос без Range - возвращаем весь файл, но с правильными заголовками
 		c.Header("Content-Length", strconv.FormatInt(totalSize, 10))
 		c.Status(http.StatusOK)
-		log.Printf("[StreamVideoProxy] Sending full content: size %d, Content-Type: %s", totalSize, contentType)
 	}
 
 	if _, err := io.Copy(c.Writer, obj); err != nil {
-		log.Printf("[StreamVideoProxy] Error copying data: %v", err)
+		log.Printf("[StreamVideo] Error copying data: %v", err)
 		return
 	}
 }
 
+// GetThumbnail - универсальная утилита для получения thumbnail
 func (h *VideoHandler) GetThumbnail(c *gin.Context) {
-	idParam := c.Param("id")
-	log.Printf("[GetThumbnail] Received ID param: %s", idParam)
-	videoID, err := uuid.Parse(idParam)
+	video, err := getVideoByID(h.service, c.Param("id"))
 	if err != nil {
-		log.Printf("[GetThumbnail] Failed to parse UUID: %v, param: %s", err, idParam)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid video ID"})
 		return
 	}
 
-	log.Printf("[GetThumbnail] Parsed UUID: %s", videoID.String())
-	video, err := h.service.GetVideoPublic(videoID)
-	if err != nil {
-		log.Printf("[GetThumbnail] Video not found: %v, UUID: %s", err, videoID.String())
+	if video == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Video not found"})
 		return
 	}
-	log.Printf("[GetThumbnail] Found video: %s, thumbnail_path: %v", video.ID.String(), video.ThumbnailPath)
 
 	if !video.ThumbnailPath.Valid || video.ThumbnailPath.String == "" {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Thumbnail not found"})
@@ -403,8 +347,6 @@ func (h *VideoHandler) GetThumbnail(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get thumbnail info"})
 		return
 	}
-
-	log.Printf("[GetThumbnail] Video ID: %s, Path: %s, Size: %d, ContentType: %s", videoID, video.ThumbnailPath.String, totalSize, contentType)
 
 	obj, err := h.service.GetObjectRange(ctx, video.ThumbnailPath.String, 0, -1)
 	if err != nil {
@@ -422,12 +364,10 @@ func (h *VideoHandler) GetThumbnail(c *gin.Context) {
 	c.Header("Cache-Control", "public, max-age=3600")
 	c.Header("Content-Length", strconv.FormatInt(totalSize, 10))
 	
-	bytesWritten, err := io.Copy(c.Writer, obj)
-	if err != nil {
-		log.Printf("[GetThumbnail] Error copying data: %v, bytes written: %d", err, bytesWritten)
+	if _, err := io.Copy(c.Writer, obj); err != nil {
+		log.Printf("[GetThumbnail] Error copying data: %v", err)
 		return
 	}
-	log.Printf("[GetThumbnail] Successfully sent %d bytes", bytesWritten)
 }
 
 func (h *VideoHandler) DeleteVideo(c *gin.Context) {

@@ -136,12 +136,12 @@ func (h *MediaHandler) UploadPhoto(c *gin.Context) {
 		return
 	}
 
-	var thumbnailURL string
-	if video.ThumbnailPath.Valid && video.ThumbnailPath.String != "" {
-		thumbnailURL = fmt.Sprintf("/api/videos/%s/thumbnail", video.ID.String())
+	var fileURL string
+	if video.FilePath != "" {
+		fileURL = fmt.Sprintf("/api/photos/%s", video.ID.String())
 	}
 
-	log.Printf("[UploadPhoto] Photo uploaded - ID: %s, ThumbnailPath: %v, ThumbnailURL: %s", video.ID.String(), video.ThumbnailPath, thumbnailURL)
+	log.Printf("[UploadPhoto] Photo uploaded - ID: %s, FilePath: %s, FileURL: %s", video.ID.String(), video.FilePath, fileURL)
 
 	response := model.VideoResponse{
 		ID:           video.ID,
@@ -149,8 +149,8 @@ func (h *MediaHandler) UploadPhoto(c *gin.Context) {
 		Description:  video.Description,
 		UserID:       video.UserID,
 		FileSize:     video.FileSize,
-		FileURL:      "", // Фото не имеют file_url
-		ThumbnailURL: thumbnailURL,
+		FileURL:      fileURL, // Фото теперь имеют file_url
+		ThumbnailURL: "", // Для фото thumbnail не используется
 		Status:       video.Status,
 		Duration:     0, // Фото не имеют duration
 		ContentType:  "image",
@@ -158,7 +158,7 @@ func (h *MediaHandler) UploadPhoto(c *gin.Context) {
 		CreatedAt:    video.CreatedAt,
 	}
 
-	log.Printf("[UploadPhoto] Response - ThumbnailURL: %s", response.ThumbnailURL)
+	log.Printf("[UploadPhoto] Response - FileURL: %s", response.FileURL)
 
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "Photo uploaded successfully",

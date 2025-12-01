@@ -1,6 +1,6 @@
 module video-service
 
-go 1.21
+go 1.23
 
 require (
 	github.com/gin-gonic/gin v1.9.1
@@ -8,6 +8,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/lib/pq v1.10.9
 	github.com/minio/minio-go/v7 v7.0.66
+	golang.org/x/image v0.20.0
 )
 
 require (
@@ -38,7 +39,7 @@ require (
 	golang.org/x/crypto v0.16.0 // indirect
 	golang.org/x/net v0.19.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/text v0.20.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
