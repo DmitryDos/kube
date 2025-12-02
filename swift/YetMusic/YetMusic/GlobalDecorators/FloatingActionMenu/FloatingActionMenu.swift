@@ -3,13 +3,14 @@ import SwiftUI
 struct FloatingActionMenu: View {
     @Environment(\.currentPage) private var currentPage
     @ObservedObject private var ui = UIStateService.shared
+    @ObservedObject private var authService = AuthService.shared
 
     private var menuButtons: [ActionButton] {
         [
             ActionButton(
                 title: "Тема",
                 icon: themeObserver.isDarkTheme ? "sun.max.fill" : "moon.fill",
-                color: .orange
+                color: themeObserver.themedAccentColor
             ) {
                 withAnimation {
                     themeObserver.toggleTheme()
@@ -19,22 +20,26 @@ struct FloatingActionMenu: View {
             ActionButton(
                 title: "Профиль",
                 icon: "person.crop.circle",
-                color: .blue
+                color: themeObserver.themedAccentColor
             ) {
-                currentPage.wrappedValue = 3
+                if authService.isAuthenticated {
+                    currentPage.wrappedValue = 3
+                } else {
+                    ModalProvider.shared.show(AuthModal())
+                }
             },
             
             ActionButton(
                 title: "Добавить треки",
                 icon: "arrow.down.circle.fill",
-                color: .yellow
+                color: themeObserver.themedAccentColor
             ) {
-                ModalProvider.shared.show(AddTrackModal())
+                ModalProvider.shared.showModalContainer(AddTrackModal())
             },
             ActionButton(
                 title: "Загрузка",
                 icon: "tray.full",
-                color: .pink
+                color: themeObserver.themedAccentColor
             ) {
                 ModalProvider.shared.show(VideoLoaderModal())
             },
@@ -48,7 +53,7 @@ struct FloatingActionMenu: View {
 
     var body: some View {
             VStack(alignment: .trailing, spacing: 12) {
-                if !ui.isFloatingMenuOpen {
+                if !ui.isFloatingMenuOpen && modalProvider.modals.isEmpty {
                     Button(action: {
                         withAnimation(.spring(response: 0.4, dampingFraction: 0.7)) {
                             openMenu()
@@ -78,10 +83,9 @@ struct FloatingActionMenu: View {
         modalProvider.show(
             FloatingActionMenuModal(buttons: menuButtons),
             onClose: {
-                withAnimation {
                     UIStateService.shared.isFloatingMenuOpen = false
-                }
-            }
+            },
+            requiresBackground: false
         )
     }
 }

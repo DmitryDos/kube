@@ -237,15 +237,22 @@ struct PlaylistSectionView: View {
     private var gridContent: some View {
         LazyVGrid(columns: gridColumns, spacing: 16) {
             ForEach(tracks) { track in
-                PlaylistTrackView(
+                TrackCardView(
                     track: track,
+                    onTap: {
+                        if showSelectionToggles {
+                            toggleTrackSelection(track)
+                        } else {
+                            QueueService.shared.playTrack(track)
+                        }
+                    },
+                    onLongPress: {
+                        onTrackLongPress(track)
+                    },
                     isEditingMode: showSelectionToggles,
                     isSelected: selectedTracks.contains(track.id),
                     onToggle: {
                         toggleTrackSelection(track)
-                    },
-                    onLongPress: {
-                        onTrackLongPress(track)
                     }
                 )
             }

@@ -25,7 +25,7 @@ struct FloatingActionMenuModal: View {
             .frame(width: 160)
             .padding(16)
             .overlay(ModalMarkerView().allowsHitTesting(false))
-            .background(themeObserver.secondaryGlassColor)
+            .background(themeObserver.primaryGlassColor)
             .cornerRadius(16)
         }
         .padding(.top, isLandscape ? 15 : 60)

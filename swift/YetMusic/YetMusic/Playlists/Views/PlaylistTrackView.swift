@@ -22,8 +22,10 @@ struct PlaylistTrackView: View {
         ZStack(alignment: .bottom) {
             AsyncTrackImage(
                 track: track,
-                cornerRadius: 10
+                cornerRadius: 10,
+                canOpenModal: false
             )
+            .aspectRatio(16/9, contentMode: .fill)
 
             if isEditingMode {
                 VStack {
@@ -33,8 +35,8 @@ struct PlaylistTrackView: View {
                         } label: {
                             Image(systemName: isSelected ? "checkmark.square.fill" : "square")
                                 .font(.system(size: 20))
-                                .foregroundColor(isSelected ? .orange : .white)
-                                .background(RoundedRectangle(cornerRadius: 4).fill(Color.black.opacity(0.7)))
+                                .foregroundColor(isSelected ? themeObserver.themedAccentColor : themeObserver.whiteColor)
+                                .background(RoundedRectangle(cornerRadius: 4).fill(themeObserver.blackColor.opacity(0.7)))
                         }
                         .buttonStyle(.plain)
                         Spacer()
@@ -65,7 +67,7 @@ struct PlaylistTrackView: View {
                 .padding(.vertical, 4)
             }
         }
-        .appBackground(padding: 6)
+        .padding(6)
         .scaleEffect(isPressed ? 1.05 : 1.0)
         .overlay(
             Group {
@@ -75,7 +77,7 @@ struct PlaylistTrackView: View {
                     } label: {
                         Image(systemName: "text.badge.plus")
                             .font(.system(size: 16, weight: .bold))
-                            .foregroundColor(themeObserver.themedPrimaryColor)
+                            .foregroundColor(themeObserver.themedAccentColor)
                             .frame(width: 32, height: 32)
                             .background(themeObserver.contrastColor)
                             .cornerRadius(8)

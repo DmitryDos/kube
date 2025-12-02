@@ -85,9 +85,9 @@ struct AuthFormView: View {
             if let error = authService.errorMessage {
                 Text(error)
                     .font(.caption)
-                    .foregroundColor(.red)
+                    .foregroundColor(themeObserver.errorColor)
                     .padding()
-                    .background(Color.red.opacity(0.1))
+                    .background(themeObserver.errorColor.opacity(0.1))
                     .cornerRadius(8)
                     .padding(.horizontal, 32)
                     .transition(.opacity)

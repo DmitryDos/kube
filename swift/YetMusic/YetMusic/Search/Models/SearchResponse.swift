@@ -24,6 +24,8 @@ enum SearchFilter: String, CaseIterable, CustomStringConvertible {
     case all = "Всё"
     case authors = "Авторы"
     case videos = "Видео"
+    case music = "Музыка"
+    case photos = "Фото"
     
     var description: String {
         return self.rawValue
@@ -106,6 +108,10 @@ enum SearchResult: Codable {
         case "author":
             let author = try container.decode(AuthorResult.self, forKey: .data)
             self = .author(author)
+        case "music", "photo":
+            // Бэкенд возвращает VideoResponse (Track) для музыки и фото, просто декодируем как Track
+            let track = try container.decode(Track.self, forKey: .data)
+            self = .video(track)
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container, debugDescription: "Unknown type: \(type)")
         }
@@ -116,7 +122,17 @@ enum SearchResult: Codable {
         
         switch self {
         case .video(let track):
-            try container.encode("video", forKey: .type)
+            // Определяем тип по contentType
+            let contentType = track.contentType?.lowercased() ?? ""
+            let type: String
+            if contentType == "audio" {
+                type = "music"
+            } else if contentType == "image" {
+                type = "photo"
+            } else {
+                type = "video"
+            }
+            try container.encode(type, forKey: .type)
             try container.encode(track, forKey: .data)
         case .author(let author):
             try container.encode("author", forKey: .type)

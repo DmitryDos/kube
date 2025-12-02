@@ -11,6 +11,7 @@
 //
 
 import SwiftUI
+import Combine
 
 struct CurrentPageKey: EnvironmentKey {
     static let defaultValue: Binding<Int> = .constant(0)
@@ -41,10 +42,13 @@ struct MusicApp: App {
 
 struct MainContentView: View {
     @Environment(\.currentPage) private var currentPage
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var orientation = OrientationObserver()
     @EnvironmentObject private var themeObserver: ThemeObserver
     @ObservedObject private var authService = AuthService.shared
+    @ObservedObject private var audioService = AudioPlayerService.shared
     @State private var scrollOffset: CGFloat = 0
+    @State private var cancellables = Set<AnyCancellable>()
     
     init() {
         // Загружаем популярные видео один раз при запуске приложения
@@ -92,13 +96,37 @@ struct MainContentView: View {
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
             }
-            .withModalProvider()
             .withFloatingMenu()
         }
         .modifier(IgnoreSafeAreaWhenLandscape(isLandscape: orientation.isLandscape))
         .ignoresSafeArea(.all, edges: [.top, .bottom])
+        .withModalProvider() // Перемещаем ModalProvider выше, чтобы он учитывал safeArea
         .environment(\.isLandscape, orientation.isLandscape)
         .environment(\.darkTheme, themeObserver.isDarkTheme)
+        .onAppear {
+            // Подписываемся на willResignActive - это самый ранний момент, когда еще можно запустить PiP
+            NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)
+                .sink { _ in
+                    print("📱 UIApplication.willResignActive - запускаем PiP")
+                    
+                    // Убеждаемся, что PiP настроен
+                    PiPController.shared.setupPiP()
+                    
+                    let audioService = AudioPlayerService.shared
+                    if let track = audioService.trackInfo.track {
+                        print("🎵 Найден трек: \(track.title), запускаем PiP")
+                        // Запускаем синхронно, пока сцена еще активна
+                        PiPController.shared.startPiP()
+                    } else {
+                        print("⚠️ Трек не найден, PiP не запускается")
+                    }
+                }
+                .store(in: &cancellables)
+        }
+        .onDisappear {
+            // Отписываемся при размонтировании
+            cancellables.removeAll()
+        }
     }
 }
 
@@ -110,6 +138,7 @@ private struct IgnoreSafeAreaWhenLandscape: ViewModifier {
 }
 
 struct UserAvatarView: View {
+    @ObservedObject private var themeObserver = ThemeObserver.shared
     @ObservedObject var authService: AuthService
     let onTap: () -> Void
     
@@ -117,18 +146,18 @@ struct UserAvatarView: View {
         Button(action: onTap) {
             if authService.isAuthenticated {
                 Circle()
-                    .fill(Color.blue)
+                    .fill(themeObserver.themedAccentColor)
                     .frame(width: 36, height: 36)
                     .overlay(
                         Text(authService.currentUser?.name.prefix(1).uppercased() ?? "U")
                             .font(.caption)
                             .fontWeight(.bold)
-                            .foregroundColor(.white)
+                            .foregroundColor(themeObserver.whiteColor)
                     )
             } else {
                 Image(systemName: "person.crop.circle.badge.plus")
                     .font(.title2)
-                    .foregroundColor(.blue)
+                    .foregroundColor(themeObserver.themedAccentColor)
             }
         }
     }

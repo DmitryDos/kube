@@ -24,7 +24,6 @@ struct FilterChipsView<T: Hashable & CustomStringConvertible>: View {
             }
             .padding(.horizontal, 8)
         }
-        .padding(.vertical, 6)
     }
 }
 
@@ -39,7 +38,7 @@ struct FilterChip: View {
         Button(action: action) {
             Text(title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundColor(isSelected ? .white : themeObserver.themedPrimaryColor)
+                .foregroundColor(isSelected ? themeObserver.whiteColor : themeObserver.textColor)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 8)
                 .background(

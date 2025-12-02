@@ -16,7 +16,7 @@ struct DetailRow: View {
     var body: some View {
         HStack {
             Text(title)
-                .foregroundColor(themeObserver.primaryGlassColor)
+                .foregroundColor(themeObserver.textColor)
             Spacer()
             Text(value)
                 .fontWeight(.medium)

@@ -15,18 +15,23 @@ struct WideButton: View {
     var isFilled: Bool = true
     var backgroundColor: Color? = nil
     var textColor: Color? = nil
+    var showBorder: Bool = true
     
     var body: some View {
         Button(action: action) {
             Text(title)
                 .font(.headline)
-                .foregroundColor(textColor ?? themeObserver.textColor)
+                .foregroundColor(textColor ?? (isFilled ? themeObserver.whiteColor : themeObserver.textColor))
                 .frame(maxWidth: .infinity)
                 .padding(.horizontal)
-                .padding(.vertical, isFilled ? 12 : 0)
+                .padding(.vertical, isFilled ? 12 : 12)
                 .background(isFilled ? backgroundColor ?? themeObserver.themedAccentColor : Color.clear)
                 .opacity(isEnabled ? 1 : 0.6)
                 .cornerRadius(10)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(isFilled || !showBorder ? Color.clear : (textColor ?? themeObserver.textColor), lineWidth: 1.5)
+                )
         }
         .disabled(!isEnabled)
         .buttonStyle(ScaleButtonStyle())

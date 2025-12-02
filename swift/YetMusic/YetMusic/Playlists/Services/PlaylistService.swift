@@ -5,12 +5,15 @@ class PlaylistService: ObservableObject {
     static let shared = PlaylistService()
     
     static let likedPlaylistID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
-    static let yourTracksPlaylistID = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
+    static let videosPlaylistID = UUID(uuidString: "00000000-0000-0000-0000-000000000002")!
+    static let musicPlaylistID = UUID(uuidString: "00000000-0000-0000-0000-000000000003")!
+    static let photosPlaylistID = UUID(uuidString: "00000000-0000-0000-0000-000000000004")!
     
     @Published var playlists: [Playlist] = []
     private let modelContainer: ModelContainer
     private let modelContext: ModelContext
     private let searchService = SearchService.shared
+    private let authService = AuthService.shared
 
     private var playlistPagination: [UUID: PlaylistPaginationState] = [:]
     
@@ -26,6 +29,15 @@ class PlaylistService: ObservableObject {
         modelContainer = PersistenceController.shared.container
         modelContext = PersistenceController.shared.context
         loadPlaylists()
+        preloadSystemPlaylists()
+    }
+    
+    private func preloadSystemPlaylists() {
+        print("[PlaylistService] preloadSystemPlaylists: isAuthenticated=\(authService.isAuthenticated), currentUser=\(authService.currentUser?.id.uuidString ?? "nil")")
+        loadPlaylistTracks(playlistID: PlaylistService.videosPlaylistID, page: 0)
+        loadPlaylistTracks(playlistID: PlaylistService.musicPlaylistID, page: 0)
+        loadPlaylistTracks(playlistID: PlaylistService.photosPlaylistID, page: 0)
+        loadPlaylistTracks(playlistID: PlaylistService.likedPlaylistID, page: 0)
     }
     
     private func loadPlaylists() {
@@ -34,46 +46,33 @@ class PlaylistService: ObservableObject {
         do {
             let descriptor = FetchDescriptor<Playlist>()
             let fetchedPlaylists = try context.fetch(descriptor)
-            
-            if fetchedPlaylists.isEmpty {
-                createSystemPlaylists()
-            } else {
-                self.playlists = fetchedPlaylists
-                purgeInvalidTrackReferences()
-            }
+            self.playlists = fetchedPlaylists.filter { !$0.isSystem }
+            purgeInvalidTrackReferences()
         } catch {
-            createSystemPlaylists()
+            self.playlists = []
         }
-    }
-    
-    private func createSystemPlaylists() {
-        let context = modelContext
-        
-        let likedPlaylist = Playlist(id: PlaylistService.likedPlaylistID, name: "Понравившееся", isSystem: true)
-        let yourTracks = Playlist(id: PlaylistService.yourTracksPlaylistID, name: "Ваши треки", isSystem: true)
-        
-        context.insert(likedPlaylist)
-        context.insert(yourTracks)
-        
-        if saveContext() {
-            playlists = [likedPlaylist, yourTracks]
-        } else {
-            createSystemPlaylistsInMemory()
-        }
-    }
-    
-    private func createSystemPlaylistsInMemory() {
-        let likedPlaylist = Playlist(id: PlaylistService.likedPlaylistID, name: "Понравившееся", isSystem: true)
-        let yourTracks = Playlist(id: PlaylistService.yourTracksPlaylistID, name: "Ваши треки", isSystem: true)
-
-        playlists = [likedPlaylist, yourTracks]
     }
     
     func getPlaylistOrder() -> [Playlist] {
-        return playlists
+        let systemPlaylists = [
+            Playlist(id: PlaylistService.videosPlaylistID, name: "Видео", isSystem: true),
+            Playlist(id: PlaylistService.musicPlaylistID, name: "Аудио", isSystem: true),
+            Playlist(id: PlaylistService.photosPlaylistID, name: "Изображения", isSystem: true),
+            Playlist(id: PlaylistService.likedPlaylistID, name: "Понравившееся", isSystem: true)
+        ]
+        return systemPlaylists + playlists
     }
     
     func getPlaylist(by id: UUID) -> Playlist? {
+        if id == PlaylistService.videosPlaylistID {
+            return Playlist(id: id, name: "Видео", isSystem: true)
+        } else if id == PlaylistService.musicPlaylistID {
+            return Playlist(id: id, name: "Аудио", isSystem: true)
+        } else if id == PlaylistService.photosPlaylistID {
+            return Playlist(id: id, name: "Изображения", isSystem: true)
+        } else if id == PlaylistService.likedPlaylistID {
+            return Playlist(id: id, name: "Понравившееся", isSystem: true)
+        }
         return playlists.first { $0.id == id }
     }
     
@@ -85,8 +84,12 @@ class PlaylistService: ObservableObject {
     func getTracksForPlaylist(_ playlistID: UUID) -> [Track] {
         guard let playlist = getPlaylist(by: playlistID) else { return [] }
         
-        if playlistID == PlaylistService.yourTracksPlaylistID {
-            return getYourTracks()
+        if playlist.isSystem {
+            if let pagination = playlistPagination[playlistID] {
+                return pagination.loadedTracks
+            }
+            loadPlaylistTracks(playlistID: playlistID, page: 0)
+            return []
         }
         
         if let pagination = playlistPagination[playlistID] {
@@ -98,17 +101,43 @@ class PlaylistService: ObservableObject {
     }
     
     func searchTracks(query: String?, completion: @escaping ([Track]) -> Void) {
+        var allTracks: [Track] = []
+        let group = DispatchGroup()
+        
+        group.enter()
+        loadTracksForFilter(query: query, filter: .videos) { tracks in
+            allTracks.append(contentsOf: tracks)
+            group.leave()
+        }
+        
+        group.enter()
+        loadTracksForFilter(query: query, filter: .music) { tracks in
+            allTracks.append(contentsOf: tracks)
+            group.leave()
+        }
+        
+        group.enter()
+        loadTracksForFilter(query: query, filter: .photos) { tracks in
+            allTracks.append(contentsOf: tracks)
+            group.leave()
+        }
+        
+        group.notify(queue: .main) {
+            completion(allTracks)
+        }
+    }
+    
+    private func loadTracksForFilter(query: String?, filter: SearchFilter, completion: @escaping ([Track]) -> Void) {
         var currentPage = 1
         var allTracks: [Track] = []
         
         func loadPage() {
             searchService.searchWithPagination(
                 query: query,
-                filter: .videos,
+                filter: filter,
                 page: currentPage,
                 pageSize: 20,
                 userId: nil,
-                mine: false,
                 trackIds: nil
             ) { page, tracks, hasMore in
                 allTracks.append(contentsOf: tracks)
@@ -126,70 +155,47 @@ class PlaylistService: ObservableObject {
     
     func getTracksForEditing(selectedTrackIds: Set<UUID>) -> [Track] {
         var allTracks: [Track] = []
-        var currentPage = 1
+        let group = DispatchGroup()
         
-        func loadPage() {
-            searchService.searchWithPagination(
-                query: nil,
-                filter: .videos,
-                page: currentPage,
-                pageSize: 20,
-                userId: nil,
-                mine: false,
-                trackIds: nil
-            ) { page, tracks, hasMore in
+        for filter in [SearchFilter.videos, .music, .photos] {
+            group.enter()
+            loadTracksForFilter(query: nil, filter: filter) { tracks in
                 let filtered = tracks.filter { selectedTrackIds.contains($0.id) }
                 allTracks.append(contentsOf: filtered)
-                if hasMore {
-                    currentPage += 1
-                    loadPage()
-                } else {
-                    return
-                }
+                group.leave()
             }
         }
         
-        loadPage()
+        group.wait()
         return allTracks
     }
     
     func getAvailableTracksForPlaylist(playlistID: UUID, selectedTrackIds: Set<UUID>, currentTracks: [Track]) -> [Track] {
         var allTracks: [Track] = []
-        var currentPage = 1
+        let group = DispatchGroup()
         
-        func loadPage() {
-            searchService.searchWithPagination(
-                query: nil,
-                filter: .videos,
-                page: currentPage,
-                pageSize: 20,
-                userId: nil,
-                mine: false,
-                trackIds: nil
-            ) { page, tracks, hasMore in
+        for filter in [SearchFilter.videos, .music, .photos] {
+            group.enter()
+            loadTracksForFilter(query: nil, filter: filter) { tracks in
                 allTracks.append(contentsOf: tracks)
-                if hasMore {
-                    currentPage += 1
-                    loadPage()
-                } else {
-                    return
-                }
+                group.leave()
             }
         }
         
-        loadPage()
+        group.wait()
         let currentTrackIds = Set(currentTracks.map { $0.id })
-        return allTracks.filter { selectedTrackIds.contains($0.id) && !currentTrackIds.contains($0) }
+        return allTracks.filter { selectedTrackIds.contains($0.id) && !currentTrackIds.contains($0.id) }
     }
     
     func loadPlaylistTracks(playlistID: UUID, page: Int = 0, completion: (() -> Void)? = nil) {
-        if playlistID == PlaylistService.yourTracksPlaylistID {
-            loadYourTracks(page: page, completion: completion)
+        guard let playlist = getPlaylist(by: playlistID) else {
+            print("[PlaylistService] loadPlaylistTracks: плейлист не найден для ID=\(playlistID)")
+            completion?()
             return
         }
         
-        guard let playlist = getPlaylist(by: playlistID) else {
-            completion?()
+        if playlist.isSystem {
+            loadSystemPlaylistTracks(playlistID: playlistID, page: page, completion: completion)
             return
         }
         
@@ -227,19 +233,40 @@ class PlaylistService: ObservableObject {
         
         let pageTrackIds = Array(allTrackIds[startIndex..<endIndex])
         
-        searchService.searchWithPagination(
-            query: nil,
-            filter: .videos,
-            page: 1,
-            pageSize: 1000,
-            userId: nil,
-            mine: false,
-            trackIds: pageTrackIds
-        ) { [weak self] loadedPage, loadedTracks, _ in
+        var allLoadedTracks: [Track] = []
+        let group = DispatchGroup()
+        
+        for filter in [SearchFilter.videos, .music, .photos] {
+            group.enter()
+            searchService.searchWithPagination(
+                query: nil,
+                filter: filter,
+                page: 1,
+                pageSize: 1000,
+                userId: nil,
+                trackIds: pageTrackIds
+            ) { loadedPage, tracks, _ in
+                allLoadedTracks.append(contentsOf: tracks)
+                group.leave()
+            }
+        }
+        
+        group.notify(queue: .main) { [weak self] in
             guard let self = self else {
                 completion?()
                 return
             }
+            
+            var uniqueTracks: [Track] = []
+            var seenIds = Set<UUID>()
+            for track in allLoadedTracks {
+                if !seenIds.contains(track.id) {
+                    uniqueTracks.append(track)
+                    seenIds.insert(track.id)
+                }
+            }
+            
+            let loadedTracks = uniqueTracks
             
             DispatchQueue.main.async {
                 guard var updatedPagination = self.playlistPagination[playlistID] else {
@@ -264,32 +291,12 @@ class PlaylistService: ObservableObject {
         }
     }
     
-    func loadMoreTracksForPlaylist(playlistID: UUID, completion: (() -> Void)? = nil) {
-        guard let pagination = playlistPagination[playlistID],
-              pagination.hasMore,
-              !pagination.isLoading else {
-            completion?()
-            return
+    private func loadSystemPlaylistTracks(playlistID: UUID, page: Int = 0, completion: (() -> Void)? = nil) {
+        if playlistPagination[playlistID] == nil {
+            playlistPagination[playlistID] = PlaylistPaginationState()
         }
         
-        loadPlaylistTracks(playlistID: playlistID, page: pagination.currentPage + 1, completion: completion)
-    }
-    
-    private func getYourTracks() -> [Track] {
-        if let pagination = playlistPagination[PlaylistService.yourTracksPlaylistID] {
-            return pagination.loadedTracks
-        }
-        
-        loadYourTracks(page: 0)
-        return []
-    }
-    
-    func loadYourTracks(page: Int = 0, completion: (() -> Void)? = nil) {
-        if playlistPagination[PlaylistService.yourTracksPlaylistID] == nil {
-            playlistPagination[PlaylistService.yourTracksPlaylistID] = PlaylistPaginationState()
-        }
-        
-        guard var pagination = playlistPagination[PlaylistService.yourTracksPlaylistID],
+        guard var pagination = playlistPagination[playlistID],
               !pagination.isLoading else {
             completion?()
             return
@@ -297,24 +304,93 @@ class PlaylistService: ObservableObject {
         
         pagination.isLoading = true
         pagination.currentPage = page
-        playlistPagination[PlaylistService.yourTracksPlaylistID] = pagination
+        playlistPagination[playlistID] = pagination
         
-        searchService.searchWithPagination(
-            query: nil,
-            filter: .videos,
-            page: page + 1,
-            pageSize: pagination.pageSize,
-            userId: nil,
-            mine: true,
-            trackIds: nil
-        ) { [weak self] loadedPage, tracks, hasMore in
+        let filter: SearchFilter
+        if playlistID == PlaylistService.videosPlaylistID {
+            filter = .videos
+        } else if playlistID == PlaylistService.musicPlaylistID {
+            filter = .music
+        } else if playlistID == PlaylistService.photosPlaylistID {
+            filter = .photos
+        } else {
+            filter = .all
+        }
+        
+        var allTracks: [Track] = []
+        let group = DispatchGroup()
+        var hasMoreAny = false
+        
+        let currentUserId = authService.currentUser?.id
+        print("[PlaylistService] loadSystemPlaylistTracks: currentUserId=\(currentUserId?.uuidString ?? "nil")")
+        
+        if filter == .all {
+            for f in [SearchFilter.videos, .music, .photos] {
+                group.enter()
+                searchService.searchWithPagination(
+                    query: nil,
+                    filter: f,
+                    page: page + 1,
+                    pageSize: pagination.pageSize,
+                    userId: currentUserId,
+                    trackIds: nil
+                ) { loadedPage, tracks, hasMore in
+                    print("[PlaylistService] loadSystemPlaylistTracks: загружено \(tracks.count) треков для фильтра \(f.rawValue)")
+                    allTracks.append(contentsOf: tracks)
+                    if hasMore {
+                        hasMoreAny = true
+                    }
+                    group.leave()
+                }
+            }
+        } else {
+            group.enter()
+            searchService.searchWithPagination(
+                query: nil,
+                filter: filter,
+                page: page + 1,
+                pageSize: pagination.pageSize,
+                userId: currentUserId,
+                trackIds: nil
+            ) { loadedPage, tracks, hasMore in
+                print("[PlaylistService] loadSystemPlaylistTracks: загружено \(tracks.count) треков для фильтра \(filter.rawValue)")
+                for track in tracks {
+                    print("[PlaylistService] Трек ID: \(track.id), title: \(track.title), videoURL: \(track.videoURL ?? "nil"), duration: \(track.duration)")
+                }
+                allTracks.append(contentsOf: tracks)
+                if hasMore {
+                    hasMoreAny = true
+                }
+                group.leave()
+            }
+        }
+        
+        group.notify(queue: .main) { [weak self] in
             guard let self = self else {
                 completion?()
                 return
             }
             
+            let tracks: [Track]
+            if filter == .all {
+                var uniqueTracks: [Track] = []
+                var seenIds = Set<UUID>()
+                for track in allTracks {
+                    if !seenIds.contains(track.id) {
+                        uniqueTracks.append(track)
+                        seenIds.insert(track.id)
+                    }
+                }
+                print("[PlaylistService] loadSystemPlaylistTracks: всего загружено \(allTracks.count) треков, после удаления дубликатов: \(uniqueTracks.count)")
+                tracks = uniqueTracks
+            } else {
+                print("[PlaylistService] loadSystemPlaylistTracks: загружено \(allTracks.count) треков для фильтра \(filter.rawValue)")
+                tracks = allTracks
+            }
+            let hasMore = hasMoreAny
+            
             DispatchQueue.main.async {
-                guard var updatedPagination = self.playlistPagination[PlaylistService.yourTracksPlaylistID] else {
+                guard var updatedPagination = self.playlistPagination[playlistID] else {
                     completion?()
                     return
                 }
@@ -329,12 +405,24 @@ class PlaylistService: ObservableObject {
                 
                 updatedPagination.isLoading = false
                 updatedPagination.hasMore = hasMore
-                self.playlistPagination[PlaylistService.yourTracksPlaylistID] = updatedPagination
+                self.playlistPagination[playlistID] = updatedPagination
                 
                 completion?()
             }
         }
     }
+    
+    func loadMoreTracksForPlaylist(playlistID: UUID, completion: (() -> Void)? = nil) {
+        guard let pagination = playlistPagination[playlistID],
+              pagination.hasMore,
+              !pagination.isLoading else {
+            completion?()
+            return
+        }
+        
+        loadPlaylistTracks(playlistID: playlistID, page: pagination.currentPage + 1, completion: completion)
+    }
+    
     
     func refreshPlaylistTracks(playlistID: UUID, completion: (() -> Void)? = nil) {
         playlistPagination[playlistID] = PlaylistPaginationState()

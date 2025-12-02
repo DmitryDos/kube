@@ -14,7 +14,7 @@ struct CustomColorPicker: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.subheadline)
-                .foregroundColor(themeObserver.primaryGlassColor)
+                .foregroundColor(themeObserver.textColor)
             
             Button(action: {
                 showColorPickerModal()
@@ -76,7 +76,6 @@ struct ColorPickerModalView: View {
                     ModalProvider.shared.dismiss()
                 },
             )
-            .padding(.horizontal)
         )
     }
     
@@ -135,15 +134,12 @@ struct ColorPickerModalView: View {
                                 .stroke(themeObserver.primaryGlassColor, lineWidth: 2)
                         )
                 }
-                .padding()
                 .background(themeObserver.contrastColor)
                 .cornerRadius(10)
                 .overlay(
                     RoundedRectangle(cornerRadius: 10)
                         .stroke(themeObserver.primaryGlassColor, lineWidth: 1)
                 )
-                
-                Spacer()
             }
         }
     }

@@ -46,12 +46,52 @@ struct ShowTrackInfoModal: View {
     }
     
     private var leftButton: AnyView? {
-        guard canEdit else { return nil }
+        var buttons: [AnyView] = []
+        
+        // Кнопка редактирования (показываем всегда, если есть тип контента)
+        let contentType = track.contentType?.lowercased() ?? ""
+        if contentType == "video" {
+            buttons.append(AnyView(
+                Button {
+                    ModalProvider.shared.showModalContainer(EditVideoModal(track: track, isReadOnly: false))
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(themeObserver.themedAccentColor)
+                }
+            ))
+        } else if contentType == "audio" {
+            buttons.append(AnyView(
+                Button {
+                    ModalProvider.shared.showModalContainer(MusicEditModal(track: track, audioURL: nil))
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(themeObserver.themedAccentColor)
+                }
+            ))
+        }
+        
+        // Кнопка удаления
+        if canEdit {
+            buttons.append(AnyView(
+                IconButton(
+                    systemName: "trash",
+                    action: handleDelete,
+                )
+            ))
+        }
+        
+        if buttons.isEmpty {
+            return nil
+        }
+        
         return AnyView(
-            IconButton(
-                systemName: "trash",
-                action: handleDelete,
-            )
+            HStack(spacing: 12) {
+                ForEach(0..<buttons.count, id: \.self) { index in
+                    buttons[index]
+                }
+            }
         )
     }
     
@@ -61,10 +101,19 @@ struct ShowTrackInfoModal: View {
             message: "Вы уверены, что хотите удалить \"\(track.title)\"?",
             alertState: alertState
         ) {
+            Task {
             do {
                 try TrackController.shared.deleteTrack(track)
-            } catch {}
+                    await MainActor.run {
             ModalProvider.shared.dismiss()
+                    }
+                } catch {
+                    print("Failed to delete music: \(error)")
+                    await MainActor.run {
+                        // Можно показать ошибку пользователю
+                    }
+                }
+            }
         }
     }
     
@@ -75,7 +124,43 @@ struct ShowTrackInfoModal: View {
             bottomButton: saveButton
         ) {
             VStack(spacing: 20) {
-                ZStack(alignment: .bottomTrailing) {
+                // Кнопка редактирования выше обложки
+                let contentType = track.contentType?.lowercased() ?? ""
+                if contentType == "video" {
+                    Button {
+                        ModalProvider.shared.showModalContainer(EditVideoModal(track: track, isReadOnly: false))
+                    } label: {
+                        HStack {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 16, weight: .medium))
+                            Text("Редактировать видео")
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        .foregroundColor(themeObserver.themedAccentColor)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(themeObserver.backgroundGlassColor)
+                        .cornerRadius(12)
+                    }
+                } else if contentType == "audio" {
+                    Button {
+                        ModalProvider.shared.showModalContainer(MusicEditModal(track: track, audioURL: nil))
+                    } label: {
+                        HStack {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 16, weight: .medium))
+                            Text("Редактировать аудио")
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        .foregroundColor(themeObserver.themedAccentColor)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(themeObserver.backgroundGlassColor)
+                        .cornerRadius(12)
+                    }
+                }
+                
+                Group {
                     if let thumbnail = selectedThumbnail {
                         Image(uiImage: thumbnail)
                             .resizable()
@@ -86,23 +171,35 @@ struct ShowTrackInfoModal: View {
                     } else {
                         AsyncTrackImage(
                             track: track,
-                            cornerRadius: 12
+                            cornerRadius: 12,
+                            imageContentMode: .fit,
+                            canOpenModal: true
                         )
-                        .frame(height: 200)
-                    }
-                    
-                    if canEdit {
-                        Button {
-                            showImagePicker = true
-                        } label: {
-                            Image(systemName: "camera.fill")
-                                .font(.system(size: 16))
-                                .foregroundColor(.white)
-                                .frame(width: 36, height: 36)
-                                .background(themeObserver.themedAccentColor)
-                                .cornerRadius(8)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                        .overlay(
+                            ModalMarkerView()
+                                .allowsHitTesting(false)
+                        )
+                        .overlay(alignment: .bottomTrailing) {
+                            if canEdit {
+                                Button {
+                                    showImagePicker = true
+                                } label: {
+                                    Image(systemName: "camera.fill")
+                                        .font(.system(size: 16))
+                                        .foregroundColor(.white)
+                                        .frame(width: 36, height: 36)
+                                        .background(themeObserver.themedAccentColor)
+                                        .cornerRadius(8)
+                                }
+                                .padding(8)
+                                .overlay(
+                                    ModalMarkerView()
+                                        .allowsHitTesting(false)
+                                )
+                            }
                         }
-                        .padding(8)
                     }
                 }
 

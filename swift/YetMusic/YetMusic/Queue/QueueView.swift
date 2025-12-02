@@ -44,7 +44,6 @@ struct QueueView: View {
                                 tracks: upcomingTracks,
                                 onTap: { track in
                                     queueService.playTrack(track)
-                                    historyService.recordPlayed(track)
                                 },
                                 onDelete: { track in
                                     queueService.removeTrackFromQueues(track)
@@ -72,7 +71,7 @@ struct QueueView: View {
 
     private var placeholder: some View {
         RoundedRectangle(cornerRadius: 10)
-            .fill(.white.opacity(0.4))
+            .fill(themeObserver.whiteColor.opacity(0.4))
             .frame(height: 70)
             .padding(.horizontal, 4)
     }
@@ -99,18 +98,19 @@ struct QueueView: View {
             }
         }
         .padding(.vertical, 6)
+        .padding(.trailing, isLandscape ? 0 : 70)
     }
 
     private func headerChip(title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundColor(isSelected ? .white : .primary)
+                .foregroundColor(isSelected ? themeObserver.whiteColor : themeObserver.textColor)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(
                     Capsule()
-                        .fill(isSelected ? themeObserver.themedAccentColor : Color.white.opacity(0.2))
+                        .fill(isSelected ? themeObserver.themedAccentColor : themeObserver.whiteColor.opacity(0.2))
                 )
         }
     }

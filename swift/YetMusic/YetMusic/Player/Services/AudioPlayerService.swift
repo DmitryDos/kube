@@ -32,12 +32,6 @@ class AudioPlayerService: NSObject, ObservableObject {
         setupAudioSession()
         setupTimeObserver()
         setupPlaybackFinishedHandler()
-        
-        NotificationCenter.default.publisher(for: .pipDidClose)
-            .sink { [weak self] _ in
-                self?.play()
-            }
-            .store(in: &cancellables)
     }
     
     private func setupAudioSession() {
@@ -96,10 +90,16 @@ class AudioPlayerService: NSObject, ObservableObject {
             player.replaceCurrentItem(with: item)
             observeItem(item)
         } else {
-            // Используем track.id для стрима, а не track.videoURL (который содержит presigned URL)
-            // Для просмотра видео авторизация не требуется
+            // Используем track.id для стрима, выбираем endpoint в зависимости от типа контента
             let base = AppConfig.apiBaseURL
-            let streamURLString = base + "/api/videos/\(track.id.uuidString)/stream/proxy"
+            let contentType = track.contentType?.lowercased() ?? ""
+            let streamURLString: String
+            if contentType == "audio" {
+                streamURLString = base + "/api/audio/\(track.id.uuidString)/stream"
+            } else {
+                // Для видео и по умолчанию
+                streamURLString = base + "/api/videos/\(track.id.uuidString)/stream"
+            }
             print("[AudioPlayerService] 🌐 Loading from stream URL: \(streamURLString)")
             
             guard let url = URL(string: streamURLString) else {
@@ -108,8 +108,16 @@ class AudioPlayerService: NSObject, ObservableObject {
             }
 
             // Настройка AVURLAsset для стриминга
-            // Не добавляем Range заголовок здесь, AVPlayer сам управляет range requests
-            let asset = AVURLAsset(url: url, options: nil)
+            // Для аудио файлов нужно указать правильные опции
+            var assetOptions: [String: Any] = [:]
+            
+            if contentType == "audio" {
+                // Для аудио файлов указываем, что это может быть аудио
+                assetOptions[AVURLAssetPreferPreciseDurationAndTimingKey] = false
+                print("[AudioPlayerService] 🎵 Configuring for audio playback")
+            }
+            
+            let asset = AVURLAsset(url: url, options: assetOptions.isEmpty ? nil : assetOptions)
             
             print("[AudioPlayerService] 📦 Created AVURLAsset, loading...")
             let item = AVPlayerItem(asset: asset)
@@ -119,10 +127,22 @@ class AudioPlayerService: NSObject, ObservableObject {
             PreloadService.shared.startPreloading(for: track)
         }
         
+        // Обновляем trackInfo синхронно, чтобы play() мог правильно определить текущий трек
         trackInfo.track = track
         trackInfo.currentTime = 0
         trackInfo.progress = 0
         trackInfo.duration = 0
+        
+        // Если это аудио трек - закрываем PiP (PiP не работает с аудио)
+        let contentType = track.contentType?.lowercased() ?? ""
+        if contentType == "audio" {
+            if PiPController.shared.isPiPActive {
+                print("[AudioPlayerService] 🎵 Audio track detected, closing PiP")
+                DispatchQueue.main.async {
+                    PiPController.shared.stopPiP()
+                }
+            }
+        }
     }
 
     private func observeItem(_ item: AVPlayerItem) {
@@ -222,12 +242,19 @@ class AudioPlayerService: NSObject, ObservableObject {
     }
     
     func play() {
+        // Если трек не загружен, пытаемся загрузить из очереди
+        // Но только если нет текущего элемента в плеере (чтобы не запускать случайный трек)
         if trackInfo.track == nil {
             if let currentTrack = queueService.getCurrentTrack() {
                 load(track: currentTrack)
-            } else {
+                // После загрузки трек будет установлен синхронно, поэтому можно сразу играть
+            } else if player.currentItem == nil {
+                // Только если нет текущего элемента в плеере, запускаем следующий трек
                 queueService.playNextTrack()
                 return
+            } else {
+                // Если есть элемент в плеере, но trackInfo.track == nil, просто играем
+                // Это может произойти при перезагрузке приложения
             }
         }
         
@@ -239,7 +266,10 @@ class AudioPlayerService: NSObject, ObservableObject {
         }
         
         player.play()
-        trackInfo.isPlaying = true
+        // Обновляем isPlaying асинхронно
+        DispatchQueue.main.async { [weak self] in
+            self?.trackInfo.isPlaying = true
+        }
         
         // Проверяем через небольшую задержку, началось ли воспроизведение
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
@@ -260,7 +290,10 @@ class AudioPlayerService: NSObject, ObservableObject {
     
     func pause() {
         player.pause()
-        trackInfo.isPlaying = false
+        // Обновляем isPlaying асинхронно
+        DispatchQueue.main.async { [weak self] in
+            self?.trackInfo.isPlaying = false
+        }
     }
     
     func startSeeking() {

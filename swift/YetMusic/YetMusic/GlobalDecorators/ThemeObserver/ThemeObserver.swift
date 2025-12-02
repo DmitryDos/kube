@@ -52,14 +52,36 @@ class ThemeObserver: ObservableObject {
         isDarkTheme ? darkColor : secondaryColor
     }
     
-    let lightGlassColor = Color(red: 0.95, green: 0.85, blue: 0.95).opacity(0.6)
-    let darkGlassColor = Color(red: 0.15, green: 0.05, blue: 0.15).opacity(0.6)
+    // Glass colors - обновлены под новую палитру, лучше сочетаются с темами
+    let lightGlassColor = Color(red: 235/255, green: 235/255, blue: 240/255).opacity(0.7)
+    let darkGlassColor = Color(red: 30/255, green: 42/255, blue: 53/255).opacity(0.7)
+    
+    // Error and success colors
+    var errorColor: Color {
+        isDarkTheme ? Color(red: 255/255, green: 107/255, blue: 107/255) : Color(red: 220/255, green: 53/255, blue: 69/255)
+    }
+    
+    var successColor: Color {
+        isDarkTheme ? Color(red: 72/255, green: 199/255, blue: 116/255) : Color(red: 40/255, green: 167/255, blue: 69/255)
+    }
+    
+    var likeColor: Color {
+        isDarkTheme ? Color(red: 255/255, green: 107/255, blue: 107/255) : Color(red: 220/255, green: 53/255, blue: 69/255)
+    }
+    
+    var whiteColor: Color {
+        isDarkTheme ? Color(red: 255/255, green: 255/255, blue: 255/255) : Color(red: 255/255, green: 255/255, blue: 255/255)
+    }
+    
+    var blackColor: Color {
+        isDarkTheme ? Color(red: 0/255, green: 0/255, blue: 0/255) : Color(red: 0/255, green: 0/255, blue: 0/255)
+    }
     var primaryGlassColor: Color {
-        isDarkTheme ? lightGlassColor : darkGlassColor
+        isDarkTheme ? darkGlassColor : lightGlassColor
     }
 
     var secondaryGlassColor: Color {
-        isDarkTheme ? darkGlassColor : lightGlassColor
+        isDarkTheme ? lightGlassColor : darkGlassColor
     }
     
     var backgroundColor: Color {
@@ -67,7 +89,7 @@ class ThemeObserver: ObservableObject {
     }
     
     var backgroundGlassColor: Color {
-        isDarkTheme ? lightGlassColor : darkGlassColor
+        isDarkTheme ? darkGlassColor : lightGlassColor
     }
     
     var backgroundAccentColor: Color {

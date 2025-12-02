@@ -9,7 +9,7 @@ class TrackController: ObservableObject {
     @Published var canLoadMore = true
     
     private let repository: TrackRepository
-    private let videoService = VideoService.shared
+    private let searchService = SearchService.shared
     private var currentPage = 0
     private let pageSize = 20
     private var currentQuery: String? = nil
@@ -18,39 +18,7 @@ class TrackController: ObservableObject {
     private init() {
         self.repository = TrackRepository()
         loadFirstPage()
-        setupVideoObserver()
         observeAuthState()
-    }
-    
-    private func setupVideoObserver() {
-        videoService.$videos
-            .receive(on: RunLoop.main)
-            .sink { [weak self] remoteVideos in
-                guard let self = self else { return }
-                
-                // Прямая конвертация RemoteVideo -> Track
-                let remoteTracks = remoteVideos.map { track -> Track in
-                    if let existing = self.tracks.first(where: { $0.id == track.id }) {
-                        track.isSaved = existing.isSaved
-                        track.localFilePath = existing.localFilePath
-                    }
-                    
-                    return track
-                }
-
-                for remoteTrack in remoteTracks {
-                    if let index = self.tracks.firstIndex(where: { $0.id == remoteTrack.id }) {
-                        self.tracks[index] = remoteTrack
-                    } else {
-                        self.tracks.append(remoteTrack)
-                    }
-                }
-
-                self.tracks.removeAll { track in
-                    return !remoteVideos.contains(where: { $0.id == track.id })
-                }
-            }
-            .store(in: &cancellables)
     }
 
     private func observeAuthState() {
@@ -82,10 +50,17 @@ class TrackController: ObservableObject {
         
         isLoading = true
         
-        videoService.loadVideos(page: currentPage, pageSize: pageSize, query: currentQuery) { [weak self] remoteVideos in
-            let work: () -> Void = {
-                guard let self = self else { return }
-                
+        searchService.searchWithPagination(
+            query: currentQuery,
+            filter: .videos,
+            page: currentPage + 1,
+            pageSize: pageSize,
+            userId: nil,
+            trackIds: nil
+        ) { [weak self] _, remoteVideos, hasMore in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
                 let newTracks: [Track] = remoteVideos.map { track in
                     if let existing = self.repository.findById(track.id) ?? self.tracks.first(where: { $0.id == track.id }) {
                         track.isSaved = existing.isSaved
@@ -96,12 +71,10 @@ class TrackController: ObservableObject {
                 }
                 
                 self.tracks.append(contentsOf: newTracks)
-                self.canLoadMore = !newTracks.isEmpty
+                self.canLoadMore = hasMore
                 self.currentPage += 1
                 self.isLoading = false
             }
-            
-            DispatchQueue.main.async(execute: work)
         }
     }
 

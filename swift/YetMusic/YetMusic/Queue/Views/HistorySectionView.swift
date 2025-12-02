@@ -32,7 +32,7 @@ private struct HistoryRow: View {
                     .lineLimit(1)
                 Text(item.desc)
                     .font(.system(size: 11))
-                    .foregroundColor(themeObserver.primaryGlassColor)
+                    .foregroundColor(themeObserver.textColor.opacity(0.7))
                     .lineLimit(1)
             }
             Spacer()

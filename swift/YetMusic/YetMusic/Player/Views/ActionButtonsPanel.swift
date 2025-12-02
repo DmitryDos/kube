@@ -24,7 +24,7 @@ struct ActionButtonsPanel: View {
                 Button(action: handleLike) {
                     Image(systemName: isLiked ? "heart.fill" : "heart")
                         .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(isLiked ? .red : themeObserver.darkColor)
+                        .foregroundColor(isLiked ? themeObserver.likeColor : themeObserver.themedAccentColor)
                         .frame(width: 36, height: 36)
                 }
                 .buttonStyle(ScaleButtonStyle())

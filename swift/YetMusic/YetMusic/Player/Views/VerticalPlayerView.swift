@@ -85,12 +85,26 @@ struct VerticalPlayerView: View {
 
     private var playerView: some View {
         Group {
-            if audio.trackInfo.track != nil {
+            if let track = audio.trackInfo.track {
+                let contentType = track.contentType?.lowercased() ?? ""
+                if contentType == "audio" {
+                    // Для аудио показываем обложку
+                    AsyncTrackImage(
+                        imageURL: track.imageURL,
+                        cornerRadius: 10,
+                        imageContentMode: .fill,
+                        showBackground: false,
+                        canOpenModal: false
+                    )
+                    .clipped()
+                } else {
+                    // Для видео показываем видео плеер
                 AVPlayerViewControllerRepresented(
                     player: audio.player,
                     isPlaying: $audio.trackInfo.isPlaying,
                     showsPlaybackControls: false
                 )
+                }
             } else {
                 Rectangle()
                     .fill(themeObserver.darkColor)
@@ -155,7 +169,7 @@ struct VerticalPlayerView: View {
                     .cornerRadius(50)
             }
             .font(.system(.caption, design: .monospaced))
-            .foregroundColor(themeObserver.darkColor)
+            .foregroundColor(themeObserver.textColor)
             .padding(.horizontal, 10)
         }
     }
@@ -196,7 +210,7 @@ struct VerticalPlayerView: View {
             .offset(y: 16)
         }
         .font(.title2)
-        .foregroundColor(themeObserver.primaryGlassColor)
+        .foregroundColor(themeObserver.themedAccentColor)
     }
 
     private func format(_ t: TimeInterval) -> String {

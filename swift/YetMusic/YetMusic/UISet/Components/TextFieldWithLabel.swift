@@ -21,24 +21,35 @@ struct TextFieldWithLabel: View {
             if let title = title {
                 Text(title)
                     .font(.caption)
-                    .foregroundColor(themeObserver.primaryGlassColor)
+                    .foregroundColor(themeObserver.textColor)
             }
             
             if isEditable {
-                TextField(placeholder, text: $text)
+                ZStack(alignment: .leading) {
+                    if text.isEmpty {
+                        Text(placeholder)
+                            .foregroundColor(themeObserver.textColor.opacity(0.5))
+                            .padding()
+                    }
+                    TextField("", text: $text)
                     .padding()
-                    .background(themeObserver.secondaryGlassColor)
+                        .background(themeObserver.primaryGlassColor)
                     .foregroundColor(themeObserver.textColor)
+                }
                     .cornerRadius(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .multilineTextAlignment(.leading)
                     .onChange(of: text) { _ in
                         onChange?()
                     }
             } else {
                 Text(text.isEmpty ? placeholder : text)
                     .padding()
-                    .background(themeObserver.secondaryGlassColor.opacity(0.5))
+                    .background(themeObserver.primaryGlassColor.opacity(0.5))
                     .foregroundColor(themeObserver.textColor.opacity(0.7))
                     .cornerRadius(10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .multilineTextAlignment(.leading)
             }
         }
     }

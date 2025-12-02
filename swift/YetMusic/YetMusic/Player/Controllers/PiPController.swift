@@ -9,8 +9,6 @@ class PiPController: NSObject, ObservableObject {
     private var hostView: UIView?
     private var isConfigured = false
     
-    private var isClosingManually = false
-    
     func setupPiP() {
         guard !isConfigured else { return }
         
@@ -42,43 +40,46 @@ class PiPController: NSObject, ObservableObject {
     }
     
     func startPiP() {
-        guard let pipController = pipController else { return }
+        guard let pipController = pipController else {
+            print("⚠️ PiP: pipController не настроен")
+            return
+        }
+        
+        guard let player = playerLayer?.player, player.currentItem != nil else {
+            print("⚠️ PiP: player не имеет currentItem")
+            return
+        }
         
         if !pipController.isPictureInPictureActive {
+            print("▶️ PiP: Запускаем Picture in Picture")
             pipController.startPictureInPicture()
+        } else {
+            print("ℹ️ PiP: Уже активен")
         }
     }
     
     func stopPiP() {
-        isClosingManually = true
         pipController?.stopPictureInPicture()
     }
 }
 
 extension PiPController: AVPictureInPictureControllerDelegate {
     func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        print("✅ PiP: Успешно запущен")
         isPiPActive = true
     }
     
     func pictureInPictureControllerDidStopPictureInPicture(_ controller: AVPictureInPictureController) {
+        print("⏹️ PiP: Остановлен")
         isPiPActive = false
-        
-        if isClosingManually {
-            if !AudioPlayerService.shared.trackInfo.isPlaying {
-                AudioPlayerService.shared.play()
-            }
-        } else {
-            NotificationCenter.default.post(name: .pipDidClose, object: nil)
-        }
-        
-        isClosingManually = false
     }
     
     func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController,
                                   failedToStartPictureInPictureWithError error: Error) {
+        print("❌ PiP: Ошибка запуска - \(error.localizedDescription)")
+        if let nsError = error as NSError? {
+            print("   Domain: \(nsError.domain), Code: \(nsError.code)")
+            print("   UserInfo: \(nsError.userInfo)")
+        }
     }
-}
-
-extension Notification.Name {
-    static let pipDidClose = Notification.Name("pipDidClose")
 }

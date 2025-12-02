@@ -21,12 +21,15 @@ class QueueService: ObservableObject {
     private init() {}
     
     private func purgeInvalid() {
-        let validIds = Set(trackController.tracks.map { $0.id })
-        if !validIds.isEmpty {
-            currentQueue.removeAll { !validIds.contains($0.id) }
-            wishlistQueue.removeAll { !validIds.contains($0.id) }
-            if currentIndex >= currentQueue.count { currentIndex = max(-1, currentQueue.count - 1) }
+        // Удаляем только треки с невалидными ID (пустые или некорректные)
+        // Не удаляем треки, которые просто не находятся в локальной базе (они могут быть из поиска)
+        currentQueue.removeAll { track in
+            track.id.uuidString.isEmpty || track.id == UUID()
         }
+        wishlistQueue.removeAll { track in
+            track.id.uuidString.isEmpty || track.id == UUID()
+        }
+        if currentIndex >= currentQueue.count { currentIndex = max(-1, currentQueue.count - 1) }
     }
 
     private func resolve(_ track: Track) -> Track {
@@ -87,15 +90,18 @@ class QueueService: ObservableObject {
     func playNextTrack() {
         if isLooping, let currentTrack = getCurrentTrack() {
             playFromStack(index: currentIndex)
+            return
         }
 
         if currentIndex + 1 < currentQueue.count {
             playFromStack(index: currentIndex + 1)
+            return
         }
 
         if !wishlistQueue.isEmpty {
             let nextTrack = wishlistQueue.removeFirst()
             playTrack(nextTrack)
+            return
         }
 
         if let randomTrack = getRandomTrack() {

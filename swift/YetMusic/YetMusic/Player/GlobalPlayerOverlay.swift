@@ -20,16 +20,5 @@ struct GlobalPlayerOverlay: View {
         .onAppear {
             PiPController.shared.setupPiP()
         }
-        .onChange(of: audio.trackInfo.isPlaying) { isPlaying in
-            handlePlaybackStateChange(isPlaying: isPlaying)
-        }
-    }
-
-    private func handlePlaybackStateChange(isPlaying: Bool) {
-        if isPlaying && currentPage != 0 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                PiPController.shared.startPiP()
-            }
-        }
     }
 }

@@ -22,16 +22,28 @@ struct CustomTextField: View {
                     .foregroundColor(themeObserver.themedAccentColor)
                 
                 if isSecure {
-                    SecureField(title, text: $text)
+                    ZStack(alignment: .leading) {
+                        if text.isEmpty {
+                            Text(title)
+                                .foregroundColor(themeObserver.textColor.opacity(0.5))
+                        }
+                        SecureField("", text: $text)
                         .textFieldStyle(PlainTextFieldStyle())
                         .keyboardType(keyboardType)
                         .foregroundColor(themeObserver.textColor)
+                    }
                 } else {
-                    TextField(title, text: $text)
+                    ZStack(alignment: .leading) {
+                        if text.isEmpty {
+                            Text(title)
+                                .foregroundColor(themeObserver.textColor.opacity(0.5))
+                        }
+                        TextField("", text: $text)
                         .textFieldStyle(PlainTextFieldStyle())
                         .keyboardType(keyboardType)
                         .autocapitalization(.none)
                         .foregroundColor(themeObserver.textColor)
+                    }
                 }
             }
             .padding(10)

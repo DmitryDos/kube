@@ -58,8 +58,11 @@ struct QueueTrackView: View {
                 AsyncTrackImage(
                     track: track,
                     cornerRadius: 0,
-                    width: rowHeight * 16 / 9
+                    canOpenModal: true
                 )
+                .frame(width: rowHeight * 16 / 9, height: rowHeight)
+                .aspectRatio(16/9, contentMode: .fill)
+                .clipped()
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -71,7 +74,7 @@ struct QueueTrackView: View {
                 
                 Text(track.desc)
                     .font(.system(size: 11))
-                    .foregroundColor(themeObserver.primaryGlassColor)
+                    .foregroundColor(themeObserver.textColor.opacity(0.7))
                     .lineLimit(1)
             }
             

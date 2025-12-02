@@ -15,7 +15,6 @@ struct CustomizationView: View {
                 title: "Отменить",
                 action: handleCancel,
             )
-            .padding(.horizontal)
         )
     }
 
@@ -55,7 +54,8 @@ struct CustomizationView: View {
                         title: themeObserver.isDarkTheme ? "Светлая тема" : "Тёмная тема",
                         action: { themeObserver.toggleTheme() },
                         isFilled: false,
-                        textColor: themeObserver.themedAccentColor
+                        textColor: themeObserver.themedAccentColor,
+                        showBorder: false
                     )
 
                     CustomColorPicker(
@@ -164,7 +164,7 @@ struct CustomizationView: View {
                             Spacer()
                             if themeObserver.backgroundImageName != nil {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
+                                    .foregroundColor(themeObserver.successColor)
                             }
                         }
                         .padding()
@@ -210,7 +210,6 @@ struct CustomizationView: View {
                     .cornerRadius(10)
                     .tint(themeObserver.themedAccentColor)
                 }
-                .padding(.horizontal)
             }
         }
         .onAppear {

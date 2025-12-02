@@ -26,7 +26,10 @@ struct StackTrackView: View {
             Color.clear.frame(width: 24)
 
             if shouldShowImage {
-                AsyncTrackImage(track: track, cornerRadius: 0, width: rowHeight * 16 / 9)
+                AsyncTrackImage(track: track, cornerRadius: 0, canOpenModal: true)
+                    .frame(width: rowHeight * 16 / 9, height: rowHeight)
+                    .aspectRatio(16/9, contentMode: .fill)
+                    .clipped()
             }
 
             VStack(alignment: .leading, spacing: 2) {

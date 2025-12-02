@@ -3,22 +3,16 @@ import SwiftUI
 struct QueueSideModal: View {
     @ObservedObject private var themeObserver = ThemeObserver.shared
 
-    var body: some View {
-        GeometryReader { geo in
-            HStack {
-                GlassBlock {
-                    VStack(spacing: 0) {
-                        QueueView()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                    .padding(.leading, 45)
-                    .frame(width: geo.size.width * 0.35, height: .infinity)
-                }
-                .padding(8)
-                
-                Spacer()
-            }
+    private var safeAreaLeading: CGFloat {
+        if let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
+           let window = windowScene.windows.first {
+            return window.safeAreaInsets.left
         }
+        return 0
+    }
+
+    var body: some View {
+        CompactQueueView()
     }
 }
 

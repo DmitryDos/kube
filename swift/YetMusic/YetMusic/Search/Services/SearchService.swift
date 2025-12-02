@@ -4,17 +4,30 @@ import Combine
 class SearchService: ObservableObject {
     static let shared = SearchService()
     
-    @Published var searchResults: [SearchResultItem] = []
+    // Отдельные хранилища для каждого типа
+    @Published var videoResults: [Track] = []
+    @Published var musicResults: [Track] = [] // Все как Track
+    @Published var photoResults: [Track] = []
+    @Published var authorResults: [AuthorResult] = []
+    
+    // Отдельные курсоры пагинации для каждого типа
+    private var videoPage: [String: Int] = [:] // query -> page
+    private var musicPage: [String: Int] = [:]
+    private var photoPage: [String: Int] = [:]
+    private var authorPage: [String: Int] = [:]
+    
+    // Флаги "есть ещё" для каждого типа
+    private var videoHasMore: [String: Bool] = [:]
+    private var musicHasMore: [String: Bool] = [:]
+    private var photoHasMore: [String: Bool] = [:]
+    private var authorHasMore: [String: Bool] = [:]
+    
     @Published var isLoading = false
     @Published var error: String?
-    @Published var hasMoreResults = true
     
     private var cancellables = Set<AnyCancellable>()
     private let baseURL = AppConfig.apiBaseURL
-    private var currentPage = 1
     private var currentQuery = ""
-    private var currentFilter: SearchFilter = .all
-    private var hasLoadedInitialVideos = false
     
     private lazy var session: URLSession = {
         let config = URLSessionConfiguration.default
@@ -23,189 +36,408 @@ class SearchService: ObservableObject {
         return URLSession(configuration: config)
     }()
     
-    func search(query: String, filter: SearchFilter = .all, loadMore: Bool = false) {
-        guard !query.isEmpty else {
-            loadPopularVideos(force: true)
-            return
-        }
+    // Computed property для объединённых результатов (для вкладки "всё")
+    // Объединяет все результаты и сортирует по дате (сверху новое)
+    var allResults: [SearchResultItem] {
+        var results: [SearchResultItem] = []
         
-        if !loadMore {
-            currentPage = 1
-            currentQuery = query
-            currentFilter = filter
-            searchResults = []
-            hasMoreResults = true
+        // Добавляем все видео
+        results.append(contentsOf: videoResults.map { .video($0) })
+        
+        // Добавляем всю музыку
+        results.append(contentsOf: musicResults.map { .video($0) })
+        
+        // Добавляем все фото
+        results.append(contentsOf: photoResults.map { .video($0) })
+        
+        // Добавляем всех авторов
+        results.append(contentsOf: authorResults.map { .author($0) })
+        
+        // Сортируем по дате (сверху новое)
+        // Для авторов используем текущую дату, так как у них нет dateAdded
+        return results.sorted { item1, item2 in
+            let date1: Date
+            let date2: Date
+            
+            switch item1 {
+            case .video(let track):
+                date1 = track.dateAdded
+            case .author:
+                date1 = Date() // Авторы всегда в конце
+            }
+            
+            switch item2 {
+            case .video(let track):
+                date2 = track.dateAdded
+            case .author:
+                date2 = Date() // Авторы всегда в конце
+            }
+            
+            return date1 > date2
+        }
+    }
+    
+    func search(query: String, filter: SearchFilter = .all) {
+        currentQuery = query
+        currentFilter = filter
+        
+        // Загружаем все типы параллельно
+        if filter == .all {
+            searchVideos(query: query, loadMore: false)
+            searchMusic(query: query, loadMore: false)
+            searchPhotos(query: query, loadMore: false)
+            searchAuthors(query: query, loadMore: false)
         } else {
-            currentPage += 1
+            // Загружаем только выбранный тип
+            switch filter {
+            case .videos:
+                searchVideos(query: query, loadMore: false)
+            case .music:
+                searchMusic(query: query, loadMore: false)
+            case .photos:
+                searchPhotos(query: query, loadMore: false)
+            case .authors:
+                searchAuthors(query: query, loadMore: false)
+            case .all:
+                break
+            }
+        }
+    }
+    
+    func loadMore(filter: SearchFilter) {
+        switch filter {
+        case .videos:
+            if videoHasMore[currentQuery] == true {
+                searchVideos(query: currentQuery, loadMore: true)
+            }
+        case .music:
+            if musicHasMore[currentQuery] == true {
+                searchMusic(query: currentQuery, loadMore: true)
+            }
+        case .photos:
+            if photoHasMore[currentQuery] == true {
+                searchPhotos(query: currentQuery, loadMore: true)
+            }
+        case .authors:
+            if authorHasMore[currentQuery] == true {
+                searchAuthors(query: currentQuery, loadMore: true)
+            }
+        case .all:
+            // Загружаем больше для всех типов
+            if videoHasMore[currentQuery] == true {
+                searchVideos(query: currentQuery, loadMore: true)
+            }
+            if musicHasMore[currentQuery] == true {
+                searchMusic(query: currentQuery, loadMore: true)
+            }
+            if photoHasMore[currentQuery] == true {
+                searchPhotos(query: currentQuery, loadMore: true)
+            }
+            if authorHasMore[currentQuery] == true {
+                searchAuthors(query: currentQuery, loadMore: true)
+            }
+        }
+    }
+    
+    func searchVideos(query: String, loadMore: Bool) {
+        if !loadMore {
+            videoResults = []
+            videoPage[query] = 1
+            videoHasMore[query] = true
         }
         
-        isLoading = true
-        error = nil
+        guard let page = videoPage[query], videoHasMore[query] == true else { return }
         
         var urlComponents = URLComponents(string: "\(baseURL)/api/search")
         urlComponents?.queryItems = [
             URLQueryItem(name: "q", value: query),
-            URLQueryItem(name: "page", value: "\(currentPage)"),
+            URLQueryItem(name: "page", value: "\(page)"),
             URLQueryItem(name: "limit", value: "20"),
-            URLQueryItem(name: "filter", value: filter.rawValue.lowercased())
+            URLQueryItem(name: "filter", value: "videos")
         ]
         
-        guard let url = urlComponents?.url else { 
-            print("[SearchService] ❌ ERROR: Failed to create URL")
-            isLoading = false
-            return 
-        }
-        
-        print("[SearchService] 📤 REQUEST (search):")
-        print("  URL: \(url.absoluteString)")
+        guard let url = urlComponents?.url else { return }
         
         var request = URLRequest(url: url)
         request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         if let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            print("  Authorization: Bearer \(token.prefix(20))...")
-        } else {
-            print("  Authorization: none")
         }
-        print("  Method: GET")
-        print("  Headers: \(request.allHTTPHeaderFields ?? [:])")
         
         session.dataTaskPublisher(for: request)
-            .handleEvents(
-                receiveOutput: { data, response in
-                    print("[SearchService] 📥 RESPONSE (search):")
-                    if let httpResponse = response as? HTTPURLResponse {
-                        print("  Status: \(httpResponse.statusCode)")
-                        print("  Headers: \(httpResponse.allHeaderFields)")
-                    }
-                    if let dataString = String(data: data, encoding: .utf8) {
-                        let preview = dataString.prefix(500)
-                        print("  Body preview (first 500 chars): \(preview)")
-                        if dataString.hasPrefix("<") {
-                            print("  ⚠️ WARNING: Response is HTML, not JSON!")
-                        }
-                    }
-                    print("  Data size: \(data.count) bytes")
-                }
-            )
             .map(\.data)
             .decode(type: SearchResponse.self, decoder: jsonDecoder)
-            .map { response in
-                response.results.map { $0.item }
-            }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] completion in
-                self?.isLoading = false
                 if case .failure(let error) = completion {
-                    print("[SearchService] Search error: \(error)")
-                    if let decodingError = error as? DecodingError {
-                        print("[SearchService] Decoding error details: \(decodingError)")
-                    }
-                    if let urlError = error as? URLError {
-                        print("[SearchService] URL error: \(urlError)")
-                    }
-                    self?.error = "Ошибка загрузки результатов: \(error.localizedDescription)"
+                    print("[SearchService] Video search error: \(error)")
                 }
-            } receiveValue: { [weak self] results in
-                print("[SearchService] Received \(results.count) results")
+            } receiveValue: { [weak self] response in
+                guard let self = self else { return }
+                let videos = response.results.compactMap { result -> Track? in
+                    guard case .video(let track) = result.item else { return nil }
+                    return track
+                }
+                
+                // Сортируем по дате (сверху новое)
+                let sortedVideos = videos.sorted { $0.dateAdded > $1.dateAdded }
+                
                 if loadMore {
-                    self?.searchResults.append(contentsOf: results)
+                    self.videoResults.append(contentsOf: sortedVideos)
+                    // Пересортировываем весь массив после добавления
+                    self.videoResults.sort { $0.dateAdded > $1.dateAdded }
                 } else {
-                    self?.searchResults = results
+                    self.videoResults = sortedVideos
                 }
-                self?.hasMoreResults = results.count >= 20
-                self?.error = nil
+                
+                self.videoHasMore[query] = videos.count >= 20
+                if videos.count >= 20 {
+                    self.videoPage[query] = (self.videoPage[query] ?? 1) + 1
+                }
+            }
+            .store(in: &cancellables)
+    }
+    
+    func searchMusic(query: String, loadMore: Bool) {
+        if !loadMore {
+            musicResults = []
+            musicPage[query] = 1
+            musicHasMore[query] = true
+        }
+        
+        guard let page = musicPage[query], musicHasMore[query] == true else { return }
+        
+        var urlComponents = URLComponents(string: "\(baseURL)/api/search")
+        urlComponents?.queryItems = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "page", value: "\(page)"),
+            URLQueryItem(name: "limit", value: "20"),
+            URLQueryItem(name: "filter", value: "music")
+        ]
+        
+        guard let url = urlComponents?.url else { return }
+        
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        if let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        session.dataTaskPublisher(for: request)
+            .map(\.data)
+            .decode(type: SearchResponse.self, decoder: jsonDecoder)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] completion in
+                if case .failure(let error) = completion {
+                    print("[SearchService] Music search error: \(error)")
+                }
+            } receiveValue: { [weak self] response in
+                guard let self = self else { return }
+                // Бэкенд возвращает все как Track
+                let tracks = response.results.compactMap { result -> Track? in
+                    guard case .video(let track) = result.item else { return nil }
+                    return track
+                }
+                
+                // Сортируем по дате (сверху новое)
+                let sortedTracks = tracks.sorted { $0.dateAdded > $1.dateAdded }
+                
+                if loadMore {
+                    self.musicResults.append(contentsOf: sortedTracks)
+                    // Пересортировываем весь массив после добавления
+                    self.musicResults.sort { $0.dateAdded > $1.dateAdded }
+                } else {
+                    self.musicResults = sortedTracks
+                }
+                
+                self.musicHasMore[query] = tracks.count >= 20
+                if tracks.count >= 20 {
+                    self.musicPage[query] = (self.musicPage[query] ?? 1) + 1
+                }
+            }
+            .store(in: &cancellables)
+    }
+    
+    func searchPhotos(query: String, loadMore: Bool) {
+        if !loadMore {
+            photoResults = []
+            photoPage[query] = 1
+            photoHasMore[query] = true
+        }
+        
+        guard let page = photoPage[query], photoHasMore[query] == true else { return }
+        
+        var urlComponents = URLComponents(string: "\(baseURL)/api/search")
+        urlComponents?.queryItems = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "page", value: "\(page)"),
+            URLQueryItem(name: "limit", value: "20"),
+            URLQueryItem(name: "filter", value: "photos")
+        ]
+        
+        guard let url = urlComponents?.url else { return }
+        
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        if let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        session.dataTaskPublisher(for: request)
+            .map(\.data)
+            .decode(type: SearchResponse.self, decoder: jsonDecoder)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] completion in
+                if case .failure(let error) = completion {
+                    print("[SearchService] Photo search error: \(error)")
+                }
+            } receiveValue: { [weak self] response in
+                guard let self = self else { return }
+                // Бэкенд возвращает все как Track
+                let tracks = response.results.compactMap { result -> Track? in
+                    guard case .video(let track) = result.item else { return nil }
+                    return track
+                }
+                
+                // Сортируем по дате (сверху новое)
+                let sortedTracks = tracks.sorted { $0.dateAdded > $1.dateAdded }
+                
+                if loadMore {
+                    self.photoResults.append(contentsOf: sortedTracks)
+                    // Пересортировываем весь массив после добавления
+                    self.photoResults.sort { $0.dateAdded > $1.dateAdded }
+                } else {
+                    self.photoResults = sortedTracks
+                }
+                
+                self.photoHasMore[query] = tracks.count >= 20
+                if tracks.count >= 20 {
+                    self.photoPage[query] = (self.photoPage[query] ?? 1) + 1
+                }
+            }
+            .store(in: &cancellables)
+    }
+    
+    func searchAuthors(query: String, loadMore: Bool) {
+        if !loadMore {
+            authorResults = []
+            authorPage[query] = 1
+            authorHasMore[query] = true
+        }
+        
+        guard let page = authorPage[query], authorHasMore[query] == true else { return }
+        
+        var urlComponents = URLComponents(string: "\(baseURL)/api/search")
+        urlComponents?.queryItems = [
+            URLQueryItem(name: "q", value: query),
+            URLQueryItem(name: "page", value: "\(page)"),
+            URLQueryItem(name: "limit", value: "20"),
+            URLQueryItem(name: "filter", value: "authors")
+        ]
+        
+        guard let url = urlComponents?.url else { return }
+        
+        var request = URLRequest(url: url)
+        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+        if let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        
+        session.dataTaskPublisher(for: request)
+            .map(\.data)
+            .decode(type: SearchResponse.self, decoder: jsonDecoder)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] completion in
+                if case .failure(let error) = completion {
+                    print("[SearchService] Author search error: \(error)")
+                }
+            } receiveValue: { [weak self] response in
+                guard let self = self else { return }
+                let authors = response.results.compactMap { result -> AuthorResult? in
+                    guard case .author(let author) = result.item else { return nil }
+                    return author
+                }
+                
+                if loadMore {
+                    self.authorResults.append(contentsOf: authors)
+                } else {
+                    self.authorResults = authors
+                }
+                
+                self.authorHasMore[query] = authors.count >= 20
+                if authors.count >= 20 {
+                    self.authorPage[query] = (self.authorPage[query] ?? 1) + 1
+                }
             }
             .store(in: &cancellables)
     }
     
     func loadPopularVideos(force: Bool = false) {
-        searchResults = []
-        
-        isLoading = true
         currentQuery = ""
-        currentFilter = .all
-        currentPage = 1
-        
-        var urlComponents = URLComponents(string: "\(baseURL)/api/search")
-        urlComponents?.queryItems = [
-            URLQueryItem(name: "q", value: ""),
-            URLQueryItem(name: "page", value: "1"),
-            URLQueryItem(name: "limit", value: "20")
-        ]
-        
-        guard let url = urlComponents?.url else { 
-            print("[SearchService] ❌ ERROR: Failed to create URL")
-            isLoading = false
-            return 
-        }
-        
-        print("[SearchService] 📤 REQUEST:")
-        print("  URL: \(url.absoluteString)")
-        
-        var request = URLRequest(url: url)
-        request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-            print("  Authorization: Bearer \(token.prefix(20))...")
-        } else {
-            print("  Authorization: none")
-        }
-        print("  Method: GET")
-        print("  Headers: \(request.allHTTPHeaderFields ?? [:])")
-        
-        URLSession.shared.dataTaskPublisher(for: request)
-            .handleEvents(
-                receiveOutput: { data, response in
-                    print("[SearchService] 📥 RESPONSE:")
-                    if let httpResponse = response as? HTTPURLResponse {
-                        print("  Status: \(httpResponse.statusCode)")
-                        print("  Headers: \(httpResponse.allHeaderFields)")
-                    }
-                    if let dataString = String(data: data, encoding: .utf8) {
-                        let preview = dataString.prefix(500)
-                        print("  Body preview (first 500 chars): \(preview)")
-                        if dataString.hasPrefix("<") {
-                            print("  ⚠️ WARNING: Response is HTML, not JSON!")
-                        }
-                    }
-                    print("  Data size: \(data.count) bytes")
-                }
-            )
-            .map(\.data)
-            .decode(type: SearchResponse.self, decoder: jsonDecoder)
-            .map { response in
-                response.results.map { $0.item }
-            }
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] completion in
-                self?.isLoading = false
-                if case .failure(let error) = completion {
-                    print("[SearchService] Load popular videos error: \(error)")
-                    if let decodingError = error as? DecodingError {
-                        print("[SearchService] Decoding error details: \(decodingError)")
-                    }
-                    if let urlError = error as? URLError {
-                        print("[SearchService] URL error: \(urlError)")
-                    }
-                    self?.error = "Ошибка загрузки: \(error.localizedDescription)"
-                }
-            } receiveValue: { [weak self] results in
-                print("[SearchService] Loaded \(results.count) popular videos")
-                self?.searchResults = results
-                self?.hasMoreResults = false
-                self?.error = nil
-                self?.hasLoadedInitialVideos = true
-            }
-            .store(in: &cancellables)
+        // Загружаем все типы при пустом запросе
+        searchVideos(query: "", loadMore: false)
+        searchMusic(query: "", loadMore: false)
+        searchPhotos(query: "", loadMore: false)
+        searchAuthors(query: "", loadMore: false)
     }
     
+    func clearResults() {
+        videoResults = []
+        musicResults = []
+        photoResults = []
+        authorResults = []
+        videoPage = [:]
+        musicPage = [:]
+        photoPage = [:]
+        authorPage = [:]
+        videoHasMore = [:]
+        musicHasMore = [:]
+        photoHasMore = [:]
+        authorHasMore = [:]
+        currentQuery = ""
+        error = nil
+    }
+    
+    // Для обратной совместимости
+    var searchResults: [SearchResultItem] {
+        get {
+            switch currentFilter {
+            case .all:
+                return allResults
+            case .videos:
+                return videoResults.map { .video($0) }
+            case .music:
+                return musicResults.map { .video($0) }
+        case .photos:
+            return photoResults.map { .video($0) }
+            case .authors:
+                return authorResults.map { .author($0) }
+            }
+        }
+    }
+    
+    var hasMoreResults: Bool {
+        switch currentFilter {
+        case .all:
+            return (videoHasMore[currentQuery] == true) || 
+                   (musicHasMore[currentQuery] == true) || 
+                   (photoHasMore[currentQuery] == true) || 
+                   (authorHasMore[currentQuery] == true)
+        case .videos:
+            return videoHasMore[currentQuery] == true
+        case .music:
+            return musicHasMore[currentQuery] == true
+        case .photos:
+            return photoHasMore[currentQuery] == true
+        case .authors:
+            return authorHasMore[currentQuery] == true
+        }
+    }
+    
+    private var currentFilter: SearchFilter = .all
+    
     func loadMoreResults() {
-        guard !currentQuery.isEmpty, hasMoreResults, !isLoading else { return }
-        print("[SearchService] Loading more results for query: \(currentQuery), page: \(currentPage + 1)")
-        search(query: currentQuery, filter: currentFilter, loadMore: true)
+        loadMore(filter: currentFilter)
     }
     
     func searchWithPagination(
@@ -214,25 +446,40 @@ class SearchService: ObservableObject {
         page: Int,
         pageSize: Int = 20,
         userId: UUID? = nil,
-        mine: Bool = false,
         trackIds: [UUID]? = nil,
         completion: @escaping (Int, [Track], Bool) -> Void
     ) {
         var urlComponents = URLComponents(string: "\(baseURL)/api/search")
+        
+        let filterValue: String
+        switch filter {
+        case .videos:
+            filterValue = "videos"
+        case .music:
+            filterValue = "music"
+        case .photos:
+            filterValue = "photos"
+        case .authors:
+            filterValue = "authors"
+        case .all:
+            filterValue = "all"
+        }
+        
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "page", value: "\(page)"),
             URLQueryItem(name: "limit", value: "\(pageSize)"),
-            URLQueryItem(name: "filter", value: filter.rawValue.lowercased())
+            URLQueryItem(name: "filter", value: filterValue)
         ]
         
         if let q = query, !q.isEmpty {
             queryItems.append(URLQueryItem(name: "q", value: q))
         }
         
-        if mine {
-            queryItems.append(URLQueryItem(name: "mine", value: "true"))
-        } else if let userId = userId {
+        if let userId = userId {
             queryItems.append(URLQueryItem(name: "user_id", value: userId.uuidString))
+            print("[SearchService] searchWithPagination: отправляем user_id=\(userId.uuidString)")
+        } else {
+            print("[SearchService] searchWithPagination: user_id не передан (nil)")
         }
         
         urlComponents?.queryItems = queryItems
@@ -242,59 +489,77 @@ class SearchService: ObservableObject {
             return
         }
         
+        print("[SearchService] searchWithPagination: URL=\(url.absoluteString)")
+        
         var request = URLRequest(url: url)
         request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
-        request.addValue("application/json", forHTTPHeaderField: "Content-Type")
         if let token = UserDefaults.standard.string(forKey: AppConfig.authTokenKey) {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         
         session.dataTaskPublisher(for: request)
-            .map(\.data)
-            .decode(type: SearchResponse.self, decoder: jsonDecoder)
-            .map { response -> (Int, [Track], Bool) in
-                let tracks = response.results.compactMap { result -> Track? in
-                    guard case .video(let track) = result else { return nil }
-                    if let trackIds = trackIds {
-                        return trackIds.contains(track.id) ? track : nil
+            .tryMap { data, response -> Data in
+                if let httpResponse = response as? HTTPURLResponse {
+                    print("[SearchService] searchWithPagination: HTTP статус=\(httpResponse.statusCode)")
+                    if let jsonString = String(data: data, encoding: .utf8) {
+                        print("[SearchService] searchWithPagination: сырой JSON ответ (первые 1000 символов): \(String(jsonString.prefix(1000)))")
                     }
-                    return track
                 }
-                let hasMore = tracks.count >= pageSize
-                return (page, tracks, hasMore)
+                return data
             }
+            .decode(type: SearchResponse.self, decoder: jsonDecoder)
             .receive(on: DispatchQueue.main)
             .sink { result in
-                if case .failure = result {
+                if case .failure(let error) = result {
+                    print("[SearchService] searchWithPagination error: \(error)")
+                    if let decodingError = error as? DecodingError {
+                        print("[SearchService] DecodingError details: \(decodingError)")
+                    }
                     completion(page, [], false)
                 }
-            } receiveValue: { page, tracks, hasMore in
-                completion(page, tracks, hasMore)
+            } receiveValue: { response in
+                print("[SearchService] searchWithPagination: получено \(response.results.count) результатов для фильтра \(filter.rawValue)")
+                
+                if let jsonData = try? JSONEncoder().encode(response),
+                   let jsonString = String(data: jsonData, encoding: .utf8) {
+                    print("[SearchService] searchWithPagination: JSON ответ (первые 500 символов): \(String(jsonString.prefix(500)))")
+                }
+                
+                for (index, result) in response.results.enumerated() {
+                    switch result.item {
+                    case .video(let track):
+                        let contentType = track.contentType?.lowercased() ?? ""
+                        print("[SearchService] результат \(index): \(contentType), id=\(track.id), title=\(track.title)")
+                    case .author:
+                        print("[SearchService] результат \(index): author")
+                    }
+                }
+                
+                let tracks: [Track]
+                
+                // Бэкенд возвращает все как VideoResponse (Track), просто декодируем
+                tracks = response.results.compactMap { result -> Track? in
+                    // Все типы контента (video, music, photo) декодируются как .video(Track)
+                    switch result.item {
+                    case .video(let track):
+                        return track
+                    case .author:
+                        return nil
+                    }
+                }
+                
+                print("[SearchService] searchWithPagination: конвертировано \(tracks.count) треков для фильтра \(filter.rawValue)")
+                
+                // Фильтруем по trackIds если нужно
+                var filteredTracks = tracks
+                if let trackIds = trackIds {
+                    filteredTracks = tracks.filter { trackIds.contains($0.id) }
+                }
+                
+                let hasMore = tracks.count >= pageSize
+                completion(page, filteredTracks, hasMore)
             }
             .store(in: &cancellables)
-    }
-    
-    func clearResults() {
-        searchResults = []
-        error = nil
-        currentPage = 1
-        currentQuery = ""
-        hasMoreResults = true
-        hasLoadedInitialVideos = false
-        
-        URLCache.shared.removeAllCachedResponses()
-    }
-    
-    static func clearAllCaches() {
-        URLCache.shared.removeAllCachedResponses()
-        
-        if let cookies = HTTPCookieStorage.shared.cookies {
-            for cookie in cookies {
-                HTTPCookieStorage.shared.deleteCookie(cookie)
-            }
-        }
-        
-        SearchService.shared.clearResults()
     }
     
     private var jsonDecoder: JSONDecoder {

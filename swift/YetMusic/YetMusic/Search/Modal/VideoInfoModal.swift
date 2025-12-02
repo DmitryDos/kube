@@ -11,14 +11,55 @@ struct VideoInfoModal: View {
     @ObservedObject private var themeObserver = ThemeObserver.shared
     let video: Track
     
+    private var isOwner: Bool {
+        guard AuthService.shared.isAuthenticated,
+              let ownerId = video.ownerUserId,
+              let currentUserId = AuthService.shared.currentUser?.id else {
+            return false
+        }
+        return ownerId == currentUserId
+    }
+    
     var body: some View {
         ModalContainer(
             title: "Информация о видео",
-            leftButton: nil,
+            leftButton: isOwner ? AnyView(
+                Button {
+                    ModalProvider.shared.showModalContainer(EditVideoModal(track: video, isReadOnly: false))
+                } label: {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundColor(themeObserver.themedAccentColor)
+                }
+            ) : nil,
             bottomButton: nil
         ) {
             VStack(spacing: 20) {
-                AsyncTrackImage(track: video, width: .infinity)
+                // Кнопка редактирования выше обложки
+                if isOwner {
+                    Button {
+                        ModalProvider.shared.showModalContainer(EditVideoModal(track: video, isReadOnly: false))
+                    } label: {
+                        HStack {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 16, weight: .medium))
+                            Text("Редактировать видео")
+                                .font(.system(size: 14, weight: .medium))
+                        }
+                        .foregroundColor(themeObserver.themedAccentColor)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(themeObserver.backgroundGlassColor)
+                        .cornerRadius(12)
+                    }
+                }
+                
+                AsyncTrackImage(
+                    track: video,
+                    imageContentMode: .fit,
+                    canOpenModal: true
+                )
+                .frame(maxWidth: .infinity)
 
                 VStack(alignment: .leading, spacing: 16) {
                     Text(video.title)
@@ -151,10 +192,16 @@ struct AuthorInfoModal: View {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(themeObserver.themedPrimaryColor.opacity(0.6))
                     
-                    TextField("Поиск видео...", text: $searchText)
+                    ZStack(alignment: .leading) {
+                        if searchText.isEmpty {
+                            Text("Поиск видео...")
+                                .foregroundColor(themeObserver.themedPrimaryColor.opacity(0.6))
+                        }
+                        TextField("", text: $searchText)
                         .foregroundColor(themeObserver.themedPrimaryColor)
                         .onSubmit {
                             loadAuthorVideos()
+                            }
                         }
                     
                     if !searchText.isEmpty {
@@ -231,17 +278,16 @@ struct AuthorInfoModal: View {
             return
         }
         
-        // Используем VideoService для загрузки видео автора
-        VideoService.shared.loadVideos(
-            page: 0,
-            pageSize: 50,
+        // Используем SearchService для загрузки видео автора
+        SearchService.shared.searchWithPagination(
             query: searchText.isEmpty ? nil : searchText,
-            userId: nil,
-            userIdUUID: userId, // Передаем UUID для фильтрации по автору
-            mine: false
-        ) { [weak self] videos in
+            filter: .videos,
+            page: 1,
+            pageSize: 50,
+            userId: userId,
+            trackIds: nil
+        ) { _, videos, _ in
             DispatchQueue.main.async {
-                guard let self = self else { return }
                 self.authorVideos = videos
                 self.isLoadingVideos = false
             }
@@ -257,8 +303,10 @@ struct AuthorVideoRow: View {
     
     var body: some View {
         HStack(spacing: 12) {
-            AsyncTrackImage(track: track, width: 80)
+            AsyncTrackImage(track: track, canOpenModal: true)
                 .frame(width: 80, height: 80)
+                .aspectRatio(1.0, contentMode: .fill)
+                .clipped()
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(track.title)
