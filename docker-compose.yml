@@ -3,11 +3,13 @@ services:
     build: ./api-gateway
     ports:
       - "8080:80"
+      - "443:443"
+    volumes:
+      - /etc/letsencrypt/live/yetmusic.ru/fullchain.pem:/etc/nginx/ssl/cert.pem:ro
+      - /etc/letsencrypt/live/yetmusic.ru/privkey.pem:/etc/nginx/ssl/key.pem:ro
     env_file:
       - .env
     environment:
-      # ALLOWED_ORIGIN должен быть установлен в .env файле
-      # Например: ALLOWED_ORIGIN=http://51.250.34.223:3004
       ALLOWED_ORIGIN: ${ALLOWED_ORIGIN}
     depends_on:
       auth-service:
