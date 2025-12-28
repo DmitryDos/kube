@@ -9,8 +9,6 @@ services:
       - /etc/letsencrypt/live/yetmusic.ru/privkey.pem:/etc/nginx/ssl/key.pem:ro
     env_file:
       - .env
-    environment:
-      ALLOWED_ORIGIN: ${ALLOWED_ORIGIN}
     depends_on:
       auth-service:
         condition: service_started
